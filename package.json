@@ -1,0 +1,19 @@
+{
+  "name": "tpo-bd2-g14",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "mongoose": "^8.19.2",
+    "neo4j-driver": "^6.0.1",
+    "redis": "^5.9.0"
+  }
+}
