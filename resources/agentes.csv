@@ -1,0 +1,7 @@
+id_agente,nombre,apellido,matricula,telefono,email,zona,activo
+101,Juan,Torres,MAT001,1187654321,juan@seguros.com,Norte,True
+102,María,Martínez,MAT002,1176543210,maria@seguros.com,Centro,True
+103,Pablo,Ramos,MAT003,1198765432,pablo@seguros.com,Oeste,True
+104,Lucía,Suárez,MAT004,1165432109,lucia@seguros.com,Sur,False
+105,Carlos,García,MAT005,1154321098,carlos@seguros.com,Cuyo,True
+106,Víctor,Rolluedo,MAT006,116543210,victor@seguros.com,Sur,True

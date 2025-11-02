@@ -1,0 +1,206 @@
+id_cliente,nombre,apellido,dni,email,telefono,direccion,ciudad,provincia,activo
+1,Laura,Gómez,32456789,laura@gmail.com,1145678901,Av. Rivadavia 1234,Buenos Aires,Buenos Aires,True
+2,Martín,Pérez,29543210,martin@gmail.com,1134567890,Calle Mitre 450,Rosario,Santa Fe,True
+3,Sofía,López,40321876,sofia@gmail.com,1123456789,Av. Santa Fe 2200,Córdoba,Córdoba,False
+4,Andrés,Fernández,38543987,andres@gmail.com,1167890123,Calle Belgrano 700,Mendoza,Mendoza,True
+5,Carla,Ruiz,31567890,carla@gmail.com,1178901234,Av. Corrientes 3200,La Plata,Buenos Aires,True
+6,Felicidad,Ferrer,44851387,felicidad.ferrer@hotmail.com,1131716131,Via de Violeta Moll 18,San Rafael,Mendoza,False
+7,Mario,Berenguer,35394590,mario.berenguer@hotmail.com,1143107765,C. Aureliano Cuenca 385,San Miguel de Tucumán,Tucumán,True
+8,Josefa,Céspedes,24659565,josefa.céspedes@hotmail.com,1138462655,Cañada de Severiano Pazos 32,Salta,Salta,True
+9,Loida,Ibañez,33802155,loida.ibañez@hotmail.com,1158017941,Vial de Julieta Prats 47,Santa Fe,Santa Fe,False
+10,Anastasia,Vives,33297383,anastasia.vives@yahoo.com,1154001977,Pasadizo de Amanda Vega 16,Cafayate,Salta,True
+11,Florencio,Dalmau,41772505,florencio.dalmau@yahoo.com,1171068007,Acceso de Albano Perez 9,San Miguel de Tucumán,Tucumán,True
+12,Macario,Batlle,42742069,macario.batlle@yahoo.com,1119612991,Pasaje de Berta Acosta 7,Salta,Salta,False
+13,Cándida,Adán,28332049,cándida.adán@hotmail.com,1167213183,Pasadizo Ariel Becerra 790,La Plata,Buenos Aires,True
+14,Diana,Cepeda,46709148,diana.cepeda@hotmail.com,1159773587,Pasadizo de Alma Cal 8,Santa Fe,Santa Fe,False
+15,Maxi,Bello,43940502,maxi.bello@yahoo.com,1171073309,Glorieta de Valentina Salcedo 17,Rafaela,Santa Fe,True
+16,Luis Miguel,Montalbán,47891445,luis miguel.montalbán@hotmail.com,1177348876,Pasaje de Coral Segura 311,Rafaela,Santa Fe,True
+17,Jeremías,Valero,44323387,jeremías.valero@gmail.com,1110296457,Pasaje Luis Pla 57,Salta,Salta,False
+18,Ricardo,Barral,29869469,ricardo.barral@yahoo.com,1196382450,Cuesta Bernarda Huguet 32,La Plata,Buenos Aires,True
+19,Asunción,Casanovas,28434191,asunción.casanovas@hotmail.com,1115103225,Ronda Tadeo Sainz 33,La Plata,Buenos Aires,True
+20,Etelvina,Bernad,20063236,etelvina.bernad@gmail.com,1148763229,Glorieta Begoña Company 682,Cafayate,Salta,False
+21,Josefina,Arcos,20308811,josefina.arcos@gmail.com,1120167708,Via Victoriano Villena 29,San Miguel de Tucumán,Tucumán,True
+22,Rico,Berenguer,31051698,rico.berenguer@gmail.com,1126515236,Plaza Eutropio Bauzà 284,Rosario,Santa Fe,False
+23,Domitila,Linares,38402563,domitila.linares@yahoo.com,1157521628,Plaza de Loreto Segovia 32,Mendoza,Mendoza,True
+24,Eligio,Quintero,31023213,eligio.quintero@gmail.com,1135852301,Vial Nereida Villanueva 51,Río Cuarto,Córdoba,True
+25,Gregorio,Hurtado,44991021,gregorio.hurtado@gmail.com,1174948634,C. Gabriel Calderón 17,San Miguel de Tucumán,Tucumán,True
+26,Adelina,Giménez,37915953,adelina.giménez@hotmail.com,1183781156,Via de Gastón Yuste 787,Rafaela,Santa Fe,True
+27,Vasco,Vilaplana,39973433,vasco.vilaplana@hotmail.com,1184393782,Callejón Ale Parejo 517,Villa Carlos Paz,Córdoba,True
+28,Miguel,Losada,32088515,miguel.losada@yahoo.com,1125675330,Vial de Isabela Sarabia 9,Mar del Plata,Buenos Aires,True
+29,Vasco,Blazquez,34437740,vasco.blazquez@yahoo.com,1199275971,Via de Maite Aguirre 59,Salta,Salta,True
+30,Florencia,Carreras,36643240,florencia.carreras@yahoo.com,1128775245,C. Calixta Cerro 6,Mar del Plata,Buenos Aires,True
+31,Marta,Gutiérrez,36070618,marta.gutiérrez@gmail.com,1199339921,Paseo de Demetrio Albero 92,Villa Carlos Paz,Córdoba,True
+32,Curro,Menendez,49264785,curro.menendez@gmail.com,1168295713,Paseo de Georgina Planas 22,La Plata,Buenos Aires,True
+33,Eusebia,Soria,41972846,eusebia.soria@yahoo.com,1173920130,Cañada de Marciano Tomás 25,San Miguel de Tucumán,Tucumán,True
+34,Javier,Miguel,27665859,javier.miguel@gmail.com,1159078848,Acceso de Ceferino Baquero 75,Mar del Plata,Buenos Aires,True
+35,Jose Francisco,Carreño,46983009,jose francisco.carreño@gmail.com,1197753055,Cuesta Edgardo Fuster 90,San Miguel de Tucumán,Tucumán,False
+36,Hermenegildo,Carrión,32158084,hermenegildo.carrión@yahoo.com,1112773525,Camino Eulalia Ramis 98,Santa Fe,Santa Fe,True
+37,Cornelio,Huguet,49721223,cornelio.huguet@hotmail.com,1176596849,Alameda Efraín Vives 296,Godoy Cruz,Mendoza,True
+38,Ale,Moliner,35022917,ale.moliner@gmail.com,1137162969,Pasadizo Conrado Paredes 9,Mendoza,Mendoza,True
+39,Epifanio,Carrión,21155290,epifanio.carrión@hotmail.com,1159193730,Rambla Manu Domínguez 766,Cafayate,Salta,True
+40,Édgar,Téllez,37877814,édgar.téllez@hotmail.com,1181457725,Vial de Fabiola Mateo 41,Río Cuarto,Córdoba,True
+41,Yolanda,Baró,22466150,yolanda.baró@hotmail.com,1181468801,Glorieta Begoña Torres 839,Mar del Plata,Buenos Aires,False
+42,Ricardo,Cerdá,34315173,ricardo.cerdá@hotmail.com,1185093478,Acceso de Cecilio Larrañaga 7,San Rafael,Mendoza,True
+43,Lupe,Márquez,26456661,lupe.márquez@yahoo.com,1125611610,Callejón Begoña Vergara 42,San Miguel de Tucumán,Tucumán,True
+44,Rubén,Zorrilla,29627788,rubén.zorrilla@gmail.com,1141457167,Pasaje de Amancio Badía 32,Mendoza,Mendoza,False
+45,Cristian,Burgos,22077630,cristian.burgos@gmail.com,1191608820,Glorieta de Montserrat Rodriguez 2,Mendoza,Mendoza,True
+46,Débora,Luís,47520493,débora.luís@yahoo.com,1180644722,Pasaje de Imelda Alba 77,Salta,Salta,True
+47,Mercedes,Casals,35995707,mercedes.casals@gmail.com,1195292867,Alameda de Marciano Rius 4,Salta,Salta,True
+48,Tomasa,Zurita,23480171,tomasa.zurita@yahoo.com,1141812763,Pasadizo Sonia Quevedo 34,Salta,Salta,True
+49,Odalis,Tenorio,26349409,odalis.tenorio@gmail.com,1148524349,Via Marcos Andreu 55,Cafayate,Salta,True
+50,Amelia,Valera,36053180,amelia.valera@yahoo.com,1115549514,Via de Guadalupe Catalá 8,Bahía Blanca,Buenos Aires,True
+51,Julie,Tomás,25675145,julie.tomás@yahoo.com,1182421352,Vial de Maxi Pujol 84,Córdoba,Córdoba,True
+52,Ernesto,Pla,26586751,ernesto.pla@hotmail.com,1182241750,Camino de Julia Madrigal 568,Cafayate,Salta,False
+53,Esmeralda,Montoya,27636245,esmeralda.montoya@hotmail.com,1187249806,Urbanización Lucila Pou 90,Rafaela,Santa Fe,True
+54,Ainara,Santana,46927094,ainara.santana@yahoo.com,1175489647,Calle de Baltasar Amaya 86,Villa Carlos Paz,Córdoba,True
+55,Olga,Pozuelo,28397122,olga.pozuelo@yahoo.com,1184194124,Pasaje de Juana Benet 59,Villa Carlos Paz,Córdoba,True
+56,Jonatan,Piña,22486027,jonatan.piña@gmail.com,1185295841,C. de María Luisa Mayol 46,Mendoza,Mendoza,True
+57,Ruperta,Armengol,38997245,ruperta.armengol@gmail.com,1139332860,Glorieta de Alejo Ariño 39,Villa Carlos Paz,Córdoba,True
+58,Ana,Almansa,49914611,ana.almansa@yahoo.com,1141305521,Urbanización de Diego Mínguez 413,Godoy Cruz,Mendoza,True
+59,Montserrat,Lara,21559355,montserrat.lara@gmail.com,1157880874,Acceso Cristian Ramis 3,Godoy Cruz,Mendoza,False
+60,Íñigo,Pedro,32359357,íñigo.pedro@yahoo.com,1167904278,C. de Ciro Vall 75,San Rafael,Mendoza,True
+61,Gertrudis,Olivera,31103713,gertrudis.olivera@yahoo.com,1136841042,Callejón Godofredo Uría 6,Salta,Salta,True
+62,Emigdio,Andres,33918238,emigdio.andres@hotmail.com,1151242216,Callejón de Ceferino Marí 33,San Rafael,Mendoza,True
+63,Marciano,Manrique,29872838,marciano.manrique@hotmail.com,1141671777,Ronda de Hortensia Arrieta 85,San Rafael,Mendoza,False
+64,Pacífica,Barreda,42455567,pacífica.barreda@hotmail.com,1169197776,Cuesta de Jorge Valenciano 235,San Miguel de Tucumán,Tucumán,True
+65,Luciano,Garriga,46953687,luciano.garriga@gmail.com,1191042246,Acceso Lorenza Luján 38,Yerba Buena,Tucumán,True
+66,Itziar,Blasco,45832440,itziar.blasco@hotmail.com,1128644702,Urbanización Valentín Carbonell 19,Yerba Buena,Tucumán,True
+67,Bernardino,Merino,28991921,bernardino.merino@gmail.com,1182955952,Acceso Gerónimo Arana 42,Godoy Cruz,Mendoza,True
+68,Poncio,Gras,34107477,poncio.gras@yahoo.com,1142286951,C. Hernando Morata 652,Yerba Buena,Tucumán,False
+69,Miguel Ángel,Farré,37345284,miguel ángel.farré@yahoo.com,1127628176,Paseo Benito Pascual 88,Río Cuarto,Córdoba,True
+70,Cebrián,Rodriguez,22098083,cebrián.rodriguez@hotmail.com,1143710630,Plaza de Diana Camacho 84,Santa Fe,Santa Fe,True
+71,Renato,Morante,29022966,renato.morante@gmail.com,1140294103,Camino de Calista Mir 22,Rafaela,Santa Fe,True
+72,Rómulo,Chaves,31883710,rómulo.chaves@hotmail.com,1174612831,Cuesta de Nélida Ibarra 403,Rafaela,Santa Fe,True
+73,Yolanda,Barreda,23976893,yolanda.barreda@hotmail.com,1166002274,Plaza Ceferino Codina 70,Mendoza,Mendoza,True
+74,Isa,Caro,25932735,isa.caro@hotmail.com,1127198429,Alameda Isidro Figueroa 737,Salta,Salta,True
+75,Odalis,Salinas,25057172,odalis.salinas@hotmail.com,1152919118,Via Marcos Vilar 41,Buenos Aires,Buenos Aires,True
+76,Cayetano,Pozuelo,47214183,cayetano.pozuelo@yahoo.com,1173530255,Paseo de Begoña Ávila 344,San Miguel de Tucumán,Tucumán,False
+77,Josué,Armengol,30945412,josué.armengol@yahoo.com,1149727496,Camino de Cebrián Casas 16,San Rafael,Mendoza,True
+78,Nayara,Milla,23729542,nayara.milla@hotmail.com,1156075359,Camino de Candelaria Seco 63,Santa Fe,Santa Fe,True
+79,Melisa,Álamo,27158558,melisa.álamo@yahoo.com,1191524206,Glorieta de Plácido Arévalo 87,Mendoza,Mendoza,True
+80,Graciano,Ruiz,26548697,graciano.ruiz@yahoo.com,1132489419,Via Fermín Toro 75,Cafayate,Salta,True
+81,Nazaret,Fabregat,28309446,nazaret.fabregat@yahoo.com,1186236841,Cañada de Marcio Cifuentes 3,Santa Fe,Santa Fe,True
+82,Maxi,Vilar,47874762,maxi.vilar@yahoo.com,1155910785,Urbanización de Eliseo Pla 333,Mendoza,Mendoza,False
+83,Pastora,Cordero,44699788,pastora.cordero@hotmail.com,1181973634,Cuesta de Valero Burgos 51,Córdoba,Córdoba,False
+84,María Ángeles,Estevez,41497719,maría ángeles.estevez@yahoo.com,1146228820,Rambla de Pili Cifuentes 12,Buenos Aires,Buenos Aires,False
+85,Xiomara,Martín,35477503,xiomara.martín@gmail.com,1180897460,Pasaje Luciano Aramburu 56,San Miguel de Tucumán,Tucumán,True
+86,Luciano,Saura,27767033,luciano.saura@hotmail.com,1174093094,Ronda de Benita Sanmartín 59,Mendoza,Mendoza,True
+87,Desiderio,Mayo,46125471,desiderio.mayo@yahoo.com,1184292174,Pasadizo de Feliciano Cañellas 9,Rafaela,Santa Fe,True
+88,Benito,Amor,47089563,benito.amor@yahoo.com,1187909316,Camino de Rosenda Canals 78,Córdoba,Córdoba,False
+89,Ale,Sanz,24827900,ale.sanz@gmail.com,1111818115,Avenida Seve Estevez 93,Villa Carlos Paz,Córdoba,False
+90,Josué,Lastra,36439850,josué.lastra@hotmail.com,1126732779,Avenida de Heliodoro Palomino 9,San Miguel de Tucumán,Tucumán,True
+91,Purificación,Vilalta,20815752,purificación.vilalta@yahoo.com,1175782397,Ronda Aristides Agullo 57,Cafayate,Salta,True
+92,Nacio,Bosch,49521117,nacio.bosch@hotmail.com,1149688281,Calle Mauricio Benito 63,Mar del Plata,Buenos Aires,False
+93,Balduino,Cruz,33839887,balduino.cruz@yahoo.com,1147207260,Avenida Godofredo Iglesia 68,Rafaela,Santa Fe,True
+94,Isabela,Torres,21853366,isabela.torres@gmail.com,1152945670,Pasaje de Tecla Moraleda 64,Salta,Salta,True
+95,Domingo,Pereira,20921849,domingo.pereira@yahoo.com,1135863186,Pasadizo de Isidora Chaves 3,Córdoba,Córdoba,True
+96,Corona,Bejarano,42196195,corona.bejarano@gmail.com,1172112363,Pasadizo de Edu Corbacho 70,San Miguel de Tucumán,Tucumán,False
+97,Araceli,Ferrer,47826704,araceli.ferrer@hotmail.com,1156824692,Pasadizo de Paloma Cerdá 2,Villa Carlos Paz,Córdoba,True
+98,Jafet,Carrión,21253741,jafet.carrión@gmail.com,1138375434,Paseo de Estefanía Cobos 14,Cafayate,Salta,True
+99,África,Herrero,26657868,áfrica.herrero@hotmail.com,1154520014,C. José María Pereira 9,Rafaela,Santa Fe,True
+100,Hermenegildo,Sales,45006904,hermenegildo.sales@hotmail.com,1123266417,Rambla Dolores Carvajal 34,Yerba Buena,Tucumán,True
+101,Mónica,Alcántara,47501056,mónica.alcántara@gmail.com,1126917538,Glorieta Hernando Pinedo 880,Villa Carlos Paz,Córdoba,True
+102,Febe,Bastida,23806881,febe.bastida@hotmail.com,1143515206,Callejón Claudio Escamilla 46,Yerba Buena,Tucumán,True
+103,Ciriaco,Batalla,35206934,ciriaco.batalla@hotmail.com,1115889106,Paseo Josué Palmer 567,Villa Carlos Paz,Córdoba,False
+104,Herminio,Soto,34840056,herminio.soto@gmail.com,1130037131,Ronda Roberto Vargas 52,Salta,Salta,True
+105,Pacífica,Miralles,44346061,pacífica.miralles@gmail.com,1152828360,Camino de Severino García 87,Rosario,Santa Fe,False
+106,Adelaida,Boix,35681252,adelaida.boix@yahoo.com,1180319306,Camino de Haroldo Goñi 31,Yerba Buena,Tucumán,True
+107,Hortensia,Sotelo,47112317,hortensia.sotelo@hotmail.com,1188080240,Via Gala Chico 99,Villa Carlos Paz,Córdoba,True
+108,Alma,Huerta,30414989,alma.huerta@gmail.com,1198280937,Ronda Gustavo Espejo 1,Buenos Aires,Buenos Aires,True
+109,Olegario,Aramburu,21050318,olegario.aramburu@yahoo.com,1144431524,Paseo de Brígida Múgica 55,Rosario,Santa Fe,True
+110,Francisco Jose,Clemente,26202621,francisco jose.clemente@hotmail.com,1147497295,Pasadizo de Alejandro Egea 75,Cafayate,Salta,False
+111,Dan,Carbó,20629608,dan.carbó@gmail.com,1124107906,Ronda Alex Royo 62,Río Cuarto,Córdoba,True
+112,Socorro,Tovar,37008134,socorro.tovar@gmail.com,1181812342,Paseo María Ángeles Galiano 93,Rosario,Santa Fe,True
+113,Benita,Segura,33940256,benita.segura@gmail.com,1120358031,Vial Flavia Nieto 34,Yerba Buena,Tucumán,True
+114,Ramiro,Araujo,22101490,ramiro.araujo@yahoo.com,1114353969,Alameda Eligio Piñeiro 61,Salta,Salta,False
+115,Mariano,Expósito,31775762,mariano.expósito@gmail.com,1128001638,Rambla de Florentina Luís 91,Rosario,Santa Fe,False
+116,Luciana,Bayona,36305281,luciana.bayona@hotmail.com,1135875339,Alameda de Juan Carlos Pozo 84,Río Cuarto,Córdoba,True
+117,Pilar,Borrego,20740618,pilar.borrego@gmail.com,1115278176,Paseo de María Teresa Sanjuan 89,Yerba Buena,Tucumán,False
+118,Francisco,Taboada,22790041,francisco.taboada@gmail.com,1192747840,Urbanización Rosario Abascal 88,Mendoza,Mendoza,True
+119,Teresa,Puig,47071593,teresa.puig@gmail.com,1195206548,Cañada de Benigna Carpio 82,San Miguel de Tucumán,Tucumán,False
+120,Maximiliano,Manzano,26176103,maximiliano.manzano@hotmail.com,1145785979,C. de Alberto Gil 90,Rosario,Santa Fe,True
+121,Glauco,Lerma,26931335,glauco.lerma@yahoo.com,1139453330,Calle de Eusebio Infante 843,Mar del Plata,Buenos Aires,True
+122,Víctor,Vargas,40900171,víctor.vargas@yahoo.com,1117800137,Pasadizo Eustaquio Cabello 520,San Miguel de Tucumán,Tucumán,True
+123,Bonifacio,Carro,22872940,bonifacio.carro@yahoo.com,1110941572,Via Teófilo Carrasco 6,San Miguel de Tucumán,Tucumán,True
+124,Darío,Villena,48131590,darío.villena@gmail.com,1195837370,Via de Carlito Oller 64,Río Cuarto,Córdoba,True
+125,Jose Luis,Carreras,27786627,jose luis.carreras@hotmail.com,1125611528,Via de Jose Ignacio Cifuentes 96,San Miguel de Tucumán,Tucumán,True
+126,Antonio,Santos,38355938,antonio.santos@yahoo.com,1152663663,Pasaje de Claudia Viñas 42,Cafayate,Salta,True
+127,Clara,Guardia,20728541,clara.guardia@gmail.com,1168549571,C. Nilo Alonso 46,Villa Carlos Paz,Córdoba,False
+128,Vicenta,Castejón,40302656,vicenta.castejón@gmail.com,1145466614,Cañada de Isidora Sierra 51,Córdoba,Córdoba,False
+129,María Carmen,Delgado,29659603,maría carmen.delgado@hotmail.com,1126952428,Avenida de Nereida Arteaga 68,Mendoza,Mendoza,True
+130,Eufemia,Barriga,42272098,eufemia.barriga@gmail.com,1141186711,C. de Pepito Codina 658,Rosario,Santa Fe,False
+131,Imelda,Cortés,39456414,imelda.cortés@hotmail.com,1170830225,Via Dora Sedano 66,San Miguel de Tucumán,Tucumán,True
+132,Maximiliano,Ribas,37562310,maximiliano.ribas@gmail.com,1194389244,Alameda Victor Manuel Bayona 4,Yerba Buena,Tucumán,True
+133,Maxi,Leiva,21651281,maxi.leiva@yahoo.com,1185254441,Alameda Roldán Higueras 99,Godoy Cruz,Mendoza,False
+134,Isaura,Cabrero,27740293,isaura.cabrero@hotmail.com,1148552914,Camino de Vito Galan 230,San Miguel de Tucumán,Tucumán,True
+135,Macarena,Herrero,45192780,macarena.herrero@hotmail.com,1173683120,Pasaje Leandra Bustamante 27,San Miguel de Tucumán,Tucumán,False
+136,Bernarda,Tormo,27790066,bernarda.tormo@gmail.com,1197372804,Plaza de Ambrosio Bustos 17,La Plata,Buenos Aires,False
+137,Fabiola,Torrents,48295237,fabiola.torrents@hotmail.com,1121995127,Pasadizo Edmundo Arce 231,Río Cuarto,Córdoba,True
+138,Severo,Guzmán,39594523,severo.guzmán@gmail.com,1123727017,Ronda Francisca Benavente 2,Río Cuarto,Córdoba,True
+139,Cleto,Villegas,25125438,cleto.villegas@gmail.com,1181653989,Urbanización de Federico Otero 310,Mendoza,Mendoza,False
+140,Octavio,Girón,21490756,octavio.girón@hotmail.com,1113042415,Via Severo Dalmau 8,Río Cuarto,Córdoba,False
+141,Alcides,Asenjo,21544803,alcides.asenjo@hotmail.com,1159136579,Rambla Alejandro Arana 934,Mar del Plata,Buenos Aires,False
+142,Morena,Antúnez,38637806,morena.antúnez@hotmail.com,1168747013,Cuesta de Cecilia Cabeza 8,Santa Fe,Santa Fe,True
+143,Lope,Reyes,34937538,lope.reyes@hotmail.com,1127817265,Vial Raimundo Osorio 68,Buenos Aires,Buenos Aires,True
+144,Gaspar,Hierro,23812478,gaspar.hierro@hotmail.com,1147651420,Cañada Natalio Moll 10,Salta,Salta,True
+145,Iris,Olmedo,49265792,iris.olmedo@hotmail.com,1115957126,Vial Cleto Vidal 90,Rosario,Santa Fe,False
+146,Ramón,Mascaró,44741975,ramón.mascaró@hotmail.com,1178117907,Vial Evelia Garcés 26,San Miguel de Tucumán,Tucumán,True
+147,Ulises,Leiva,43459502,ulises.leiva@yahoo.com,1155056949,Cuesta Bibiana Pacheco 82,Río Cuarto,Córdoba,False
+148,Zaira,Medina,45127225,zaira.medina@yahoo.com,1119376315,Plaza de Lucas Fonseca 671,Córdoba,Córdoba,True
+149,Sandra,Gilabert,26284270,sandra.gilabert@hotmail.com,1117980404,Alameda de Ildefonso Abascal 62,Yerba Buena,Tucumán,False
+150,Cirino,Solera,24074524,cirino.solera@yahoo.com,1192381073,Calle Maristela Rocamora 612,Cafayate,Salta,True
+151,Ascensión,Coca,29545106,ascensión.coca@yahoo.com,1194425117,Pasadizo de Édgar Roman 52,Mar del Plata,Buenos Aires,True
+152,Amílcar,Céspedes,24995509,amílcar.céspedes@yahoo.com,1118144808,Urbanización Eufemia Vaquero 13,La Plata,Buenos Aires,False
+153,Valerio,Vélez,21611298,valerio.vélez@gmail.com,1116547943,Paseo de Víctor Mosquera 93,Río Cuarto,Córdoba,True
+154,Leonel,Aguado,41033954,leonel.aguado@hotmail.com,1126113080,Paseo Santiago Grande 457,Rafaela,Santa Fe,True
+155,Ovidio,Agustí,44643499,ovidio.agustí@gmail.com,1160033875,Acceso de Ramiro España 68,La Plata,Buenos Aires,True
+156,Mateo,Rodríguez,33292988,mateo.rodríguez@yahoo.com,1198103877,Ronda Nazaret Maldonado 46,San Miguel de Tucumán,Tucumán,True
+157,Samuel,Cámara,21719409,samuel.cámara@gmail.com,1146228519,Vial de Manuela Agustí 43,Salta,Salta,True
+158,Conrado,Gallo,38410392,conrado.gallo@hotmail.com,1124665416,Avenida de Roldán Ros 48,Córdoba,Córdoba,True
+159,Dimas,Monreal,42268798,dimas.monreal@yahoo.com,1146224721,Avenida de Amador Julián 7,Mar del Plata,Buenos Aires,True
+160,Martin,Arias,23925219,martin.arias@gmail.com,1174165073,Calle de Nacio Escrivá 63,Rosario,Santa Fe,False
+161,Lino,Polo,36319518,lino.polo@hotmail.com,1151875695,Alameda de Clementina Galván 64,Cafayate,Salta,False
+162,Julia,Puig,39656194,julia.puig@gmail.com,1195031037,Ronda Alicia Luque 71,Cafayate,Salta,True
+163,Baldomero,Quevedo,23494493,baldomero.quevedo@hotmail.com,1127429139,Acceso de Bernardita Asensio 46,Mendoza,Mendoza,True
+164,Cruz,Royo,35772358,cruz.royo@hotmail.com,1114534873,Cuesta de Virgilio Cuevas 4,Santa Fe,Santa Fe,True
+165,Miguel,Valbuena,37917108,miguel.valbuena@yahoo.com,1119079941,C. Celia Nogueira 2,Cafayate,Salta,True
+166,Adrián,Martin,45031562,adrián.martin@gmail.com,1176343187,Calle de Salvador Ocaña 800,Mar del Plata,Buenos Aires,True
+167,Agustina,Cordero,39445421,agustina.cordero@yahoo.com,1155437533,Acceso Ariel Rios 505,Bahía Blanca,Buenos Aires,False
+168,Kike,Sureda,39989485,kike.sureda@hotmail.com,1134436824,Pasadizo Victoriano Pelayo 838,Santa Fe,Santa Fe,True
+169,Juan Luis,Ropero,29297762,juan luis.ropero@yahoo.com,1134638903,Via Pilar Cid 40,Yerba Buena,Tucumán,False
+170,Adora,Nicolau,40829031,adora.nicolau@hotmail.com,1178258369,Alameda Diana Llamas 4,Buenos Aires,Buenos Aires,True
+171,Virgilio,Casares,21973185,virgilio.casares@gmail.com,1150013094,Alameda de Hermenegildo Falcón 9,Bahía Blanca,Buenos Aires,False
+172,Baudelio,Arco,30084796,baudelio.arco@hotmail.com,1198454697,Plaza de Reyes Barranco 57,Rafaela,Santa Fe,False
+173,Ángel,Hernando,23424463,ángel.hernando@gmail.com,1157250277,Paseo Armando Maldonado 67,Santa Fe,Santa Fe,True
+174,Pepita,Poza,45841373,pepita.poza@yahoo.com,1121714258,Paseo de Tere Montero 110,San Rafael,Mendoza,True
+175,Renato,Malo,48064961,renato.malo@yahoo.com,1158166089,Calle Dominga Pérez 965,La Plata,Buenos Aires,True
+176,Apolonia,Laguna,28058372,apolonia.laguna@hotmail.com,1147365854,Pasaje de Evita Olivera 59,Córdoba,Córdoba,False
+177,Lázaro,Oliva,31460020,lázaro.oliva@hotmail.com,1113429340,Acceso Juan Carlos Alcántara 399,Rafaela,Santa Fe,True
+178,Custodio,Amador,32499247,custodio.amador@gmail.com,1121947703,C. de Marcelino Rivas 21,San Miguel de Tucumán,Tucumán,False
+179,Custodia,Mur,47887366,custodia.mur@gmail.com,1135351869,Glorieta de Duilio Duque 63,Mar del Plata,Buenos Aires,True
+180,Estrella,Cárdenas,39463647,estrella.cárdenas@hotmail.com,1180558909,Vial de Néstor Ureña 77,Córdoba,Córdoba,True
+181,Leonardo,Pereira,25718136,leonardo.pereira@yahoo.com,1183885079,Rambla de Maximiano Frutos 84,Godoy Cruz,Mendoza,True
+182,Melania,Palacio,47591819,melania.palacio@gmail.com,1126654964,Urbanización de Cirino Vallejo 64,Mar del Plata,Buenos Aires,True
+183,Cecilio,Verdejo,48237941,cecilio.verdejo@yahoo.com,1148593651,Paseo de Feliciano Aznar 67,Salta,Salta,True
+184,Haroldo,Uriarte,42577219,haroldo.uriarte@hotmail.com,1165506359,Camino Arturo Garay 958,Córdoba,Córdoba,True
+185,Basilio,Arnaiz,45616929,basilio.arnaiz@hotmail.com,1124137614,Urbanización Dani Montserrat 6,Río Cuarto,Córdoba,True
+186,Modesta,Camacho,33302949,modesta.camacho@gmail.com,1161697216,Via de Mercedes Armas 8,Godoy Cruz,Mendoza,False
+187,Eustaquio,Parra,25367196,eustaquio.parra@gmail.com,1189551572,Callejón Catalina Boada 27,Córdoba,Córdoba,True
+188,Sebastián,Valdés,28712076,sebastián.valdés@yahoo.com,1140315462,Calle Francisco Trujillo 22,Rafaela,Santa Fe,True
+189,Luís,Atienza,39183725,luís.atienza@gmail.com,1149651664,Pasadizo Máxima Manjón 7,Godoy Cruz,Mendoza,False
+190,Leyre,Coca,28089625,leyre.coca@hotmail.com,1165075092,Alameda de Carmelita Sevilla 72,Bahía Blanca,Buenos Aires,True
+191,Hernando,Gallo,43770877,hernando.gallo@hotmail.com,1153096652,Pasaje Gastón Gracia 978,Mendoza,Mendoza,True
+192,Viviana,Vilanova,30633285,viviana.vilanova@gmail.com,1136102297,Via de Natividad Barba 88,Rafaela,Santa Fe,True
+193,Angélica,Donoso,37605759,angélica.donoso@yahoo.com,1122337334,Pasadizo de Ainara Crespi 104,Mendoza,Mendoza,True
+194,Isaías,Amador,42098403,isaías.amador@gmail.com,1198010891,Rambla Fátima Prada 590,Córdoba,Córdoba,False
+195,Dulce,Piñol,29209275,dulce.piñol@gmail.com,1179852825,Cuesta Rosalía Calatayud 3,Yerba Buena,Tucumán,True
+196,Cecilia,Vega,45822152,cecilia.vega@yahoo.com,1141332422,Plaza Anna Abella 25,Mar del Plata,Buenos Aires,True
+197,Casemiro,Prado,25308959,casemiro.prado@gmail.com,1121080223,Cañada de Lola Ayllón 78,Río Cuarto,Córdoba,False
+198,Jose Manuel,Sanchez,42892776,jose manuel.sanchez@gmail.com,1138180054,Paseo de Bienvenida Manzano 321,Mar del Plata,Buenos Aires,False
+199,Eliseo,Serra,24595677,eliseo.serra@gmail.com,1159056570,Via Hortensia Osorio 94,Yerba Buena,Tucumán,True
+200,Úrsula,Valle,20642613,úrsula.valle@gmail.com,1136547923,Pasadizo de Yago Barral 41,Santa Fe,Santa Fe,True
+201,Beatriz,Santiago,38782447,beatriz.santiago@yahoo.com,1175706071,Rambla Yaiza Izquierdo 271,Bahía Blanca,Buenos Aires,False
+202,Adriana,Ferrán,36563747,adriana.ferrán@yahoo.com,1182770497,Paseo de Leocadia Murcia 1,Mendoza,Mendoza,False
+203,Dani,Garmendia,36975029,dani.garmendia@hotmail.com,1111603828,Alameda María Dolores Bárcena 3,Villa Carlos Paz,Córdoba,True
+204,Mar,Acero,30931403,mar.acero@yahoo.com,1196415166,Cuesta Alicia Lopez 8,Bahía Blanca,Buenos Aires,True
+205,Lucho,Robledo,21909503,lucho.robledo@yahoo.com,1167969443,Plaza de Alfredo Vicente 176,Mendoza,Mendoza,True

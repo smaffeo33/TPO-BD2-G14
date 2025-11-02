@@ -1,0 +1,81 @@
+id_siniestro,nro_poliza,fecha,tipo,monto_estimado,descripcion,estado
+9001,POL1001,20/3/2025,Accidente,500000,Colision frontal en autopista,Abierto
+9002,POL1002,10/8/2024,Robo,300000,Robo de vivienda asegurada,Cerrado
+9003,POL1004,2/5/2025,Danio,150000,Danio parcial en vehiculo,Abierto
+9004,POL1005,18/1/2025,Incendio,700000,Incendio en cocina del hogar,En evaluacion
+9005,POL1003,15/11/2023,Accidente,200000,Accidente leve en ruta,Cerrado
+9006,POL1004,21/3/2025,Accidente,500100,Colision frontal en autopista,Abierto
+9007,POL1005,11/8/2024,Robo,300100,Robo de vivienda asegurada,Cerrado
+9008,POL1006,3/5/2025,Danio,150100,Danio parcial en vehiculo,Abierto
+9009,POL1007,19/1/2025,Incendio,700100,Incendio en cocina del hogar,En evaluacion
+9010,POL1008,16/11/2023,Accidente,200100,,Cerrado
+9011,POL1009,22/3/2025,Accidente,500200,Colision frontal en autopista,Abierto
+9012,POL1010,12/8/2024,Robo,300200,Robo de vivienda asegurada,Cerrado
+9013,POL1051,4/5/2025,Danio,150200,Danio parcial en vehiculo,Abierto
+9014,POL1052,20/1/2025,Incendio,700200,Incendio en cocina del hogar,En evaluacion
+9015,POL1053,17/11/2023,Accidente,200200,Accidente leve,Cerrado
+9016,POL1054,23/3/2025,Accidente,500300,Colision frontal en autopista,Abierto
+9017,POL1055,13/8/2024,Robo,300300,Robo de vivienda asegurada,Cerrado
+9018,POL1056,5/5/2025,Danio,150300,Danio parcial en vehiculo,Abierto
+9019,POL1057,21/1/2025,Incendio,700300,Incendio en cocina del hogar,En evaluacion
+9020,POL1058,18/11/2023,Accidente,200300,Accidente leve,Cerrado
+9021,POL1059,24/3/2025,Accidente,500400,Colision frontal en autopista,Abierto
+9022,POL1060,14/8/2024,Robo,300400,Robo de vivienda asegurada,Cerrado
+9023,POL1061,6/5/2025,Danio,150400,Danio parcial en vehiculo,Abierto
+9024,POL1062,22/1/2025,Incendio,700400,Incendio en cocina del hogar,En evaluacion
+9025,POL1063,19/11/2023,Accidente,200400,Accidente leve,Cerrado
+9026,POL1064,25/3/2025,Accidente,500500,Colision frontal en autopista,Abierto
+9027,POL1025,15/8/2024,Robo,300500,Robo de vivienda asegurada,Cerrado
+9028,POL1026,7/5/2025,Danio,150500,,Abierto
+9029,POL1027,23/1/2025,Incendio,700500,Incendio en cocina del hogar,En evaluacion
+9030,POL1028,20/11/2023,Accidente,200500,Accidente leve,Cerrado
+9031,POL1029,26/3/2025,Accidente,500600,Colision frontal en autopista,Abierto
+9032,POL1030,16/8/2024,Robo,300600,Robo de vivienda asegurada,Cerrado
+9033,POL1031,8/5/2025,Danio,150600,Danio parcial,Abierto
+9034,POL1032,24/1/2025,Incendio,700600,Incendio en cocina del hogar,En evaluacion
+9035,POL1033,21/11/2023,Accidente,200600,Accidente leve,Cerrado
+9036,POL1034,27/3/2025,Accidente,500700,Colision frontal en autopista,Abierto
+9037,POL1035,17/8/2024,Robo,300700,Robo de vivienda asegurada,Cerrado
+9038,POL1036,9/5/2025,Danio,150700,Danio parcial,Abierto
+9039,POL1037,25/1/2025,Incendio,700700,Incendio en cocina del hogar,En evaluacion
+9040,POL1038,22/11/2023,Accidente,200700,Accidente leve,Cerrado
+9041,POL1039,28/3/2025,Accidente,500800,Colision frontal en autopista,Abierto
+9042,POL1040,18/8/2024,Robo,300800,Robo de vivienda asegurada,Cerrado
+9043,POL1041,10/5/2025,Danio,150800,Danio parcial,Abierto
+9044,POL1042,26/1/2025,Incendio,700800,Incendio en cocina del hogar,En evaluacion
+9045,POL1043,23/11/2023,Accidente,200800,Accidente leve,Cerrado
+9046,POL1044,29/3/2025,Accidente,500900,Colision frontal en autopista,Abierto
+9047,POL1045,19/8/2024,Robo,300900,Robo de vivienda asegurada,Cerrado
+9048,POL1046,11/5/2025,Danio,150900,Danio parcial,Abierto
+9049,POL1047,27/1/2025,Incendio,700900,Incendio en cocina del hogar,En evaluacion
+9050,POL1048,24/11/2023,Accidente,200900,Accidente leve,Cerrado
+9051,POL1049,30/3/2025,Accidente,501000,Colision frontal en autopista,Abierto
+9052,POL1050,20/8/2024,Robo,301000,Robo de vivienda asegurada,Cerrado
+9067,POL1051,12/5/2025,Danio,151000,Danio parcial,Abierto
+9068,POL1052,28/1/2025,Incendio,701000,Incendio en cocina del hogar,En evaluacion
+9069,POL1053,25/11/2023,Accidente,201000,Accidente leve,Cerrado
+9070,POL1054,31/3/2025,Accidente,501100,Colision frontal en autopista,Abierto
+9071,POL1055,21/8/2024,Robo,301100,Robo de vivienda asegurada,Cerrado
+9072,POL1056,13/5/2025,Danio,151100,Danio parcial,Abierto
+9073,POL1057,29/1/2025,Incendio,701100,Incendio en cocina del hogar,En evaluacion
+9074,POL1058,26/11/2023,Accidente,201100,Accidente leve,Cerrado
+9075,POL1059,1/4/2025,Accidente,501200,Colision frontal en autopista,Abierto
+9076,POL1060,22/8/2024,Robo,301200,Robo de vivienda asegurada,Cerrado
+9077,POL1061,14/5/2025,Danio,151200,Danio parcial,Abierto
+9078,POL1062,30/1/2025,Incendio,701200,Incendio en cocina del hogar,En evaluacion
+9079,POL1063,27/11/2023,Accidente,201200,Accidente leve,Cerrado
+9080,POL1064,2/4/2025,Accidente,501300,,Abierto
+9081,POL1065,23/8/2024,Robo,301300,Robo de vivienda asegurada,Cerrado
+9082,POL1066,15/5/2025,Danio,151300,Danio parcial,Abierto
+9083,POL1067,31/1/2025,Incendio,701300,Incendio en cocina del hogar,En evaluacion
+9084,POL1068,28/11/2023,Accidente,201300,Accidente leve,Cerrado
+9085,POL1069,3/4/2025,Accidente,501400,Colision en ruta,Abierto
+9086,POL1070,24/8/2024,Robo,301400,Robo de vivienda asegurada,Cerrado
+9087,POL1071,16/5/2025,Danio,151400,Danio parcial,Abierto
+9088,POL1072,1/2/2025,Incendio,701400,Incendio en cocina del hogar,En evaluacion
+9089,POL1001,29/11/2023,Accidente,201400,Accidente leve,Cerrado
+9090,POL1002,4/4/2025,Accidente,501500,Colision en ruta,Abierto
+9091,POL1004,25/8/2024,Robo,301500,Robo de vivienda asegurada,Cerrado
+9092,POL1005,17/5/2025,Danio,151500,Danio parcial,Abierto
+9093,POL1003,2/2/2025,Incendio,701500,Incendio en cocina del hogar,En evaluacion
+9094,POL1078,30/11/2023,Accidente,201500,Accidente leve,Cerrado
