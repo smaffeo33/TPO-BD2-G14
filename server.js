@@ -1,13 +1,13 @@
 // server.js
 const express = require('express');
+const cron = require('node-cron');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Import database connections
 const { connectMongo } = require('./config/db.mongo');
 const { checkNeo4jConnection } = require('./config/db.neo4j');
-const { connectRedis } = require('./config/db.redis');
-
+const { connectRedis, redisClient } = require('./config/db.redis');
 // Import routes
 const apiRoutes = require('./routes/api');
 
@@ -75,6 +75,17 @@ async function startServer() {
         await connectRedis();
 
         console.log('✅ Todas las bases de datos conectadas exitosamente\n');
+
+        console.log('⏰ Iniciando tareas programadas...');
+        // Corre "a las 00:00 (medianoche) todos los días"
+        cron.schedule('0 0 * * *', () => {
+            console.log('🌙 EJECUTANDO TAREA DIARIA: Invalidando cachés de ranking...');
+
+            redisClient.del('ranking:top10_clientes');
+
+
+            console.log('🌙 Cachés de reportes invalidados.');
+        });
 
         // Start Express server
         app.listen(PORT, () => {
