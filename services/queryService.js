@@ -5,25 +5,40 @@ const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
 
 /**
- * Q1: Clientes activos con sus pólizas vigentes
+ * Q1: Clientes activos con sus pólizas vigentes (array embebido)
  * Base: Neo4j
+ * Cada cliente activo aparece una vez con su array de pólizas vigentes (vacío si no tiene)
  */
 async function getClientesActivosConPolizasVigentes() {
     const session = getNeo4jSession();
     try {
         const result = await session.run(`
-            MATCH (c:Cliente {activo: true})-[:TIENE_POLIZA]->(p:Poliza)
+            MATCH (c:Cliente {activo: true})
+            OPTIONAL MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
             WHERE p.estado = 'vigente' OR p.estado = 'activa'
-            RETURN c.id_cliente AS id_cliente, c.nombre AS cliente_nombre,
-                   p.nro_poliza AS nro_poliza, p.tipo AS tipo_poliza
-            ORDER BY c.nombre, p.nro_poliza
+            WITH c, collect({
+                nro_poliza: p.nro_poliza,
+                tipo: p.tipo,
+                fecha_inicio: p.fecha_inicio,
+                fecha_fin: p.fecha_fin,
+                cobertura_total: p.cobertura_total
+            }) AS polizas_vigentes
+            RETURN c.id_cliente AS id_cliente,
+                   c.nombre AS cliente_nombre,
+                   polizas_vigentes
+            ORDER BY c.nombre
         `);
-        return result.records.map(record => ({
-            id_cliente: record.get('id_cliente'),
-            cliente_nombre: record.get('cliente_nombre'),
-            nro_poliza: record.get('nro_poliza'),
-            tipo_poliza: record.get('tipo_poliza')
-        }));
+        return result.records.map(record => {
+            const polizas = record.get('polizas_vigentes');
+            // Filtrar nulls (cuando no hay pólizas, collect devuelve [{nro_poliza: null, ...}])
+            const polizasLimpias = polizas.filter(p => p.nro_poliza !== null);
+
+            return {
+                id_cliente: record.get('id_cliente'),
+                cliente_nombre: record.get('cliente_nombre'),
+                polizas_vigentes: polizasLimpias
+            };
+        });
     } finally {
         await session.close();
     }
