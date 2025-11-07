@@ -24,29 +24,34 @@ function processCSV(fileName) {
 
 const parseCliente = (c) => ({
     ...c,
-    activo: c.activo === 'true'
+    activo: c.activo === 'True' || c.activo === 'true'
 });
 const parseAgente = (a) => ({
     ...a,
-    activo: a.activo === 'true'
+    activo: a.activo === 'True' || a.activo === 'true'
 });
 const parsePoliza = (p) => ({
     ...p,
     prima_mensual: parseFloat(p.prima_mensual),
     cobertura_total: parseFloat(p.cobertura_total),
-    fecha_inicio: new Date(p.fecha_inicio),
-    fecha_fin: new Date(p.fecha_fin),
+    fecha_inicio: parseDateDDMMYYYY(p.fecha_inicio),
+    fecha_fin: parseDateDDMMYYYY(p.fecha_fin),
 });
 const parseVehiculo = (v) => ({
     ...v,
     anio: parseInt(v.anio, 10),
-    asegurado: v.asegurado === 'true'
+    asegurado: v.asegurado === 'True' || v.asegurado === 'true'
 });
 const parseSiniestro = (s) => ({
     ...s,
     monto_estimado: parseFloat(s.monto_estimado),
-    fecha: new Date(s.fecha),
+    fecha: parseDateDDMMYYYY(s.fecha),
 });
+
+function parseDateDDMMYYYY(dateStr) {
+    const [day, month, year] = dateStr.split('/');
+    return new Date(year, month - 1, day);
+}
 
 
 async function main() {
@@ -85,10 +90,25 @@ async function main() {
         console.log('Mapeando datos...');
         const clientesMap = new Map(clientesCSV.map(c => [c.id_cliente, parseCliente(c)]));
         const agentesMap = new Map(agentesCSV.map(a => [a.id_agente, parseAgente(a)]));
-        const polizasMap = new Map(polizasCSV.map(p => [p.nro_poliza, parsePoliza(p)]));
-        const vehiculosByClienteMap = new Map(vehiculosCSV.map(v => [v.id_cliente, parseVehiculo(v)]));
 
-        const polizasByClienteMap = polizasCSV.reduce((acc, p) => {
+        const validPolizasCSV = polizasCSV.filter(p => {
+            if (p.id_agente && p.id_agente.trim() !== '' && !agentesMap.has(p.id_agente)) {
+                console.warn(`⚠️  Póliza ${p.nro_poliza} omitida: agente ${p.id_agente} no existe`);
+                return false;
+            }
+            return true;
+        });
+
+        const polizasMap = new Map(validPolizasCSV.map(p => [p.nro_poliza, parsePoliza(p)]));
+
+        const vehiculosByClienteMap = vehiculosCSV.reduce((acc, v) => {
+            const parsedV = parseVehiculo(v);
+            if (!acc.has(parsedV.id_cliente)) acc.set(parsedV.id_cliente, []);
+            acc.get(parsedV.id_cliente).push(parsedV);
+            return acc;
+        }, new Map());
+
+        const polizasByClienteMap = validPolizasCSV.reduce((acc, p) => {
             const parsedP = parsePoliza(p);
             if (!acc.has(parsedP.id_cliente)) acc.set(parsedP.id_cliente, []);
             acc.get(parsedP.id_cliente).push(parsedP);
@@ -101,35 +121,88 @@ async function main() {
         if (agentesMongo.length > 0) await db.collection('agentes').insertMany(agentesMongo);
 
         const polizasMongo = Array.from(polizasMap.values()).map(p => {
-            const agente = agentesMap.get(p.id_agente);
-            return { ...p, agente: { id_agente: agente.id_agente, nombre: agente.nombre, apellido: agente.apellido, matricula: agente.matricula } };
+            if (p.id_agente && p.id_agente.trim() !== '') {
+                const agente = agentesMap.get(p.id_agente);
+                return {
+                    ...p,
+                    agente: {
+                        id_agente: agente.id_agente,
+                        nombre: agente.nombre,
+                        apellido: agente.apellido,
+                        matricula: agente.matricula
+                    }
+                };
+            } else {
+                console.log(`ℹ️  Póliza ${p.nro_poliza} creada sin agente asignado`);
+                return { ...p, agente: null };
+            }
         });
         if (polizasMongo.length > 0) await db.collection('polizas').insertMany(polizasMongo);
 
-        const siniestrosMongo = siniestrosCSV.map(s => {
-            const parsedS = parseSiniestro(s);
-            const poliza = polizasMap.get(parsedS.nro_poliza);
-            const cliente = clientesMap.get(poliza.id_cliente);
-            const agente = agentesMap.get(poliza.id_agente);
-            return {
-                ...parsedS,
-                poliza_snapshot: {
-                    nro_poliza: poliza.nro_poliza, tipo_cobertura: poliza.tipo, fecha_vigencia_inicio: poliza.fecha_inicio, fecha_vigencia_fin: poliza.fecha_fin,
-                    cliente: { id_cliente: cliente.id_cliente, nombre: `${cliente.nombre} ${cliente.apellido}`, contacto: cliente.email },
-                    agente: { id_agente: agente.id_agente, nombre: `${agente.nombre} ${agente.apellido}`, matricula: agente.matricula }
+        const siniestrosMongo = siniestrosCSV
+            .filter(s => {
+                const poliza = polizasMap.get(s.nro_poliza);
+                if (!poliza) {
+                    console.warn(`⚠️  Siniestro ${s.id_siniestro} omitido: póliza ${s.nro_poliza} no existe`);
+                    return false;
                 }
-            };
-        });
+                return true;
+            })
+            .map(s => {
+                const parsedS = parseSiniestro(s);
+                const poliza = polizasMap.get(parsedS.nro_poliza);
+                const cliente = clientesMap.get(poliza.id_cliente);
+
+                let agenteSnapshot = null;
+                if (poliza.id_agente && poliza.id_agente.trim() !== '') {
+                    const agente = agentesMap.get(poliza.id_agente);
+                    if (agente) {
+                        agenteSnapshot = {
+                            id_agente: agente.id_agente,
+                            nombre: `${agente.nombre} ${agente.apellido}`,
+                            matricula: agente.matricula
+                        };
+                    }
+                }
+
+                return {
+                    ...parsedS,
+                    poliza_snapshot: {
+                        nro_poliza: poliza.nro_poliza,
+                        tipo_cobertura: poliza.tipo,
+                        fecha_vigencia_inicio: poliza.fecha_inicio,
+                        fecha_vigencia_fin: poliza.fecha_fin,
+                        cliente: {
+                            id_cliente: cliente.id_cliente,
+                            nombre: `${cliente.nombre} ${cliente.apellido}`,
+                            contacto: cliente.email
+                        },
+                        agente: agenteSnapshot
+                    }
+                };
+            });
         if (siniestrosMongo.length > 0) await db.collection('siniestros').insertMany(siniestrosMongo);
 
         const clientesMongo = Array.from(clientesMap.values()).map(c => {
-            const vehiculo = vehiculosByClienteMap.get(c.id_cliente);
+            const vehiculos = vehiculosByClienteMap.get(c.id_cliente) || [];
             const clientePolizas = polizasByClienteMap.get(c.id_cliente) || [];
-            const polizaAutoVigente = clientePolizas.find(p => p.estado === 'vigente' && (p.tipo === 'Total' || p.tipo === 'Terceros'));
+
+            const polizaAutoVigente = clientePolizas.find(p => {
+                const estado = p.estado.toLowerCase();
+                const tipo = p.tipo.toLowerCase();
+                return (estado === 'vigente' || estado === 'activa') && tipo === 'auto';
+            });
             return {
                 ...c,
-                vehiculo: vehiculo || null,
-                poliza_auto_vigente: polizaAutoVigente ? { nro_poliza: polizaAutoVigente.nro_poliza, tipo: polizaAutoVigente.tipo, fecha_inicio: polizaAutoVigente.fecha_inicio, fecha_fin: polizaAutoVigente.fecha_fin, cobertura_total: polizaAutoVigente.cobertura_total } : null
+                vehiculos: vehiculos,
+                poliza_auto_vigente: polizaAutoVigente ? {
+                    nro_poliza: polizaAutoVigente.nro_poliza,
+                    tipo: polizaAutoVigente.tipo,
+                    fecha_inicio: polizaAutoVigente.fecha_inicio,
+                    fecha_fin: polizaAutoVigente.fecha_fin,
+                    cobertura_total: polizaAutoVigente.cobertura_total,
+                    prima_mensual: polizaAutoVigente.prima_mensual
+                } : null
             };
         });
         if (clientesMongo.length > 0) await db.collection('clientes').insertMany(clientesMongo);
@@ -143,15 +216,19 @@ async function main() {
         await neo4jSession.run('CREATE INDEX poliza_id IF NOT EXISTS FOR (n:Poliza) ON (n.nro_poliza)');
         await neo4jSession.run('CREATE INDEX siniestro_id IF NOT EXISTS FOR (n:Siniestro) ON (n.id_siniestro)');
 
-        if (clientesCSV.length > 0) await neo4jSession.run('UNWIND $clientes AS c CREATE (n:Cliente {id_cliente: c.id_cliente, nombre: c.nombre + " " + c.apellido, activo: c.activo = "true"})', { clientes: clientesCSV });
-        if (agentesCSV.length > 0) await neo4jSession.run('UNWIND $agentes AS a CREATE (n:Agente {id_agente: a.id_agente, nombre: a.nombre + " " + a.apellido, activo: a.activo = "true"})', { agentes: agentesCSV });
-        if (polizasCSV.length > 0) await neo4jSession.run('UNWIND $polizas AS p CREATE (n:Poliza {nro_poliza: p.nro_poliza, estado: p.estado, tipo: p.tipo, fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin, cobertura_total: toFloat(p.cobertura_total)})', { polizas: polizasCSV });
+        if (clientesCSV.length > 0) await neo4jSession.run('UNWIND $clientes AS c CREATE (n:Cliente {id_cliente: c.id_cliente, nombre: c.nombre + " " + c.apellido, activo: c.activo = "True" OR c.activo = "true"})', { clientes: clientesCSV });
+        if (agentesCSV.length > 0) await neo4jSession.run('UNWIND $agentes AS a CREATE (n:Agente {id_agente: a.id_agente, nombre: a.nombre + " " + a.apellido, activo: a.activo = "True" OR a.activo = "true"})', { agentes: agentesCSV });
+        if (validPolizasCSV.length > 0) await neo4jSession.run('UNWIND $polizas AS p CREATE (n:Poliza {nro_poliza: p.nro_poliza, estado: toLower(p.estado), tipo: p.tipo, fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin, cobertura_total: toFloat(p.cobertura_total)})', { polizas: validPolizasCSV });
         if (siniestrosCSV.length > 0) await neo4jSession.run('UNWIND $siniestros AS s CREATE (n:Siniestro {id_siniestro: s.id_siniestro, tipo: s.tipo, fecha: s.fecha, estado: s.estado, monto_estimado: toFloat(s.monto_estimado)})', { siniestros: siniestrosCSV });
         console.log('Nodos de Neo4j cargados.');
 
-        if (polizasCSV.length > 0) {
-            await neo4jSession.run('UNWIND $polizas AS p MATCH (c:Cliente {id_cliente: p.id_cliente}) MATCH (p_node:Poliza {nro_poliza: p.nro_poliza}) CREATE (c)-[:TIENE_POLIZA]->(p_node)', { polizas: polizasCSV });
-            await neo4jSession.run('UNWIND $polizas AS p MATCH (a:Agente {id_agente: p.id_agente}) MATCH (p_node:Poliza {nro_poliza: p.nro_poliza}) CREATE (a)-[:GESTIONA]->(p_node)', { polizas: polizasCSV });
+        if (validPolizasCSV.length > 0) {
+            await neo4jSession.run('UNWIND $polizas AS p MATCH (c:Cliente {id_cliente: p.id_cliente}) MATCH (p_node:Poliza {nro_poliza: p.nro_poliza}) CREATE (c)-[:TIENE_POLIZA]->(p_node)', { polizas: validPolizasCSV });
+
+            const polizasConAgente = validPolizasCSV.filter(p => p.id_agente && p.id_agente.trim() !== '');
+            if (polizasConAgente.length > 0) {
+                await neo4jSession.run('UNWIND $polizas AS p MATCH (a:Agente {id_agente: p.id_agente}) MATCH (p_node:Poliza {nro_poliza: p.nro_poliza}) CREATE (a)-[:GESTIONA]->(p_node)', { polizas: polizasConAgente });
+            }
         }
         if (siniestrosCSV.length > 0) {
             await neo4jSession.run('UNWIND $siniestros AS s MATCH (p_node:Poliza {nro_poliza: s.nro_poliza}) MATCH (s_node:Siniestro {id_siniestro: s.id_siniestro}) CREATE (p_node)-[:CUBRE_SINIESTRO]->(s_node)', { siniestros: siniestrosCSV });
@@ -162,23 +239,27 @@ async function main() {
         console.log('Calculando y cargando en Redis...');
         const multi = redisClient.multi();
 
-        // 7.1. Q5: Contadores de Pólizas por Agente
-        const agentePolizasCount = polizasCSV.reduce((acc, p) => { acc.set(p.id_agente, (acc.get(p.id_agente) || 0) + 1); return acc; }, new Map());
+        const agentePolizasCount = validPolizasCSV
+            .filter(p => p.id_agente && p.id_agente.trim() !== '')
+            .reduce((acc, p) => {
+                acc.set(p.id_agente, (acc.get(p.id_agente) || 0) + 1);
+                return acc;
+            }, new Map());
         for (const [id, count] of agentePolizasCount) {
             multi.hSet("counts:agente:polizas", id, count);
         }
 
-        // 7.2. Q12: Contadores de Siniestros por Agente
         const agenteSiniestrosCount = siniestrosCSV.reduce((acc, s) => {
             const poliza = polizasMap.get(s.nro_poliza);
-            if (poliza) { acc.set(poliza.id_agente, (acc.get(poliza.id_agente) || 0) + 1); }
+            if (poliza && poliza.id_agente && poliza.id_agente.trim() !== '') {
+                acc.set(poliza.id_agente, (acc.get(poliza.id_agente) || 0) + 1);
+            }
             return acc;
         }, new Map());
         for (const [id, count] of agenteSiniestrosCount) {
             multi.hSet("counts:agente:siniestros", id, count);
         }
 
-        // 7.3. Q7: Ranking Top 10 Clientes por Cobertura
         const coberturaPorCliente = Array.from(polizasByClienteMap.entries()).map(([id_cliente, polizas]) => ({
             id_cliente, total_cobertura: polizas.reduce((sum, p) => sum + p.cobertura_total, 0)
         }));
