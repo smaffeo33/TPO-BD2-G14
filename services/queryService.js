@@ -74,25 +74,47 @@ async function getSiniestrosAbiertos() {
  * Base: MongoDB (simple query with embedded data)
  */
 async function getVehiculosAsegurados() {
-    const clientes = await Cliente.find({
-        'vehiculos.0': { $exists: true }, // Has at least one vehicle
-        'vehiculos.asegurado': true
-    }).select('id_cliente nombre apellido vehiculos poliza_auto_vigente').lean();
+    // Obtener la fecha y hora actual para la comparación
+    const today = new Date();
 
-    const result = [];
-    for (const cliente of clientes) {
-        for (const vehiculo of cliente.vehiculos) {
-            if (vehiculo.asegurado) {
-                result.push({
-                    vehiculo: `${vehiculo.marca} ${vehiculo.modelo} (${vehiculo.patente})`,
-                    cliente: `${cliente.nombre} ${cliente.apellido}`,
-                    poliza: cliente.poliza_auto_vigente ? cliente.poliza_auto_vigente.nro_poliza : 'Sin póliza'
-                });
+    const result = await Cliente.aggregate([
+        {
+            // 1. Filtrar clientes que:
+            $match: {
+                'vehiculos.0': { $exists: true }, // Tengan al menos un vehículo
+                'poliza_auto_vigente': { $exists: true }, // Tengan una póliza de auto embebida
+                'poliza_auto_vigente.fecha_fin': { $gte: today } // Esa póliza AÚN esté vigente (fecha_fin >= hoy)
+            }
+        },
+        {
+            // 2. queremos cada vehículo como un documento separado
+            $unwind: '$vehiculos'
+        },
+        {
+            // 3. Filtrar solo los vehículos que están asegurados
+            //   TODO: yo eliminaria este booleano, no tiene sentido, ya nos fijamos en cliente si hay póliza. Si hay claramente, está asegurado
+            $match: {
+                'vehiculos.asegurado': true
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                vehiculo: {
+                    $concat: [
+                        '$vehiculos.marca', ' ', '$vehiculos.modelo',
+                        ' (', '$vehiculos.patente', ')'
+                    ]
+                },
+                cliente: { $concat: ['$nombre', ' ', '$apellido'] },
+                poliza: '$poliza_auto_vigente.nro_poliza'
             }
         }
-    }
+    ]);
+
     return result;
 }
+
 
 /**
  * Q4: Clientes sin pólizas activas
