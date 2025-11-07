@@ -92,7 +92,7 @@ async function getVehiculosAsegurados() {
         },
         {
             // 3. Filtrar solo los vehículos que están asegurados
-            //   TODO: yo eliminaria este booleano, no tiene sentido, ya nos fijamos en cliente si hay póliza. Si hay claramente, está asegurado
+            //   TODO: yo eliminaria este booleano, no tiene sentido, ya nos fijamos en cliente si hay póliza. Si hay claramente, está asegurado --> fijarnos en los datasets si hay alguna inconsistencia
             $match: {
                 'vehiculos.asegurado': true
             }
@@ -125,11 +125,10 @@ async function getClientesSinPolizasActivas() {
     try {
         const result = await session.run(`
             MATCH (c:Cliente)
-            WHERE NOT (c)-[:TIENE_POLIZA]->(:Poliza)
-               OR NOT EXISTS {
-                   MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
-                   WHERE p.estado = 'vigente' OR p.estado = 'activa'
-               }
+            WHERE NOT EXISTS {
+                MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
+                WHERE p.estado = 'vigente' OR p.estado = 'activa'
+            }
             RETURN c.id_cliente AS id_cliente, c.nombre AS nombre, c.activo AS activo
             ORDER BY c.nombre
         `);
