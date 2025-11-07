@@ -173,9 +173,9 @@ router.get('/queries/q12', async (req, res) => {
 
 /**
  * Create new cliente
- * POST /api/clientes
+ * POST /queries/q13
  */
-router.post('/clientes', async (req, res) => {
+router.post('/queries/q13', async (req, res) => {
     try {
         const cliente = await clienteService.createCliente(req.body);
         res.status(201).json({ success: true, data: cliente });
@@ -184,37 +184,12 @@ router.post('/clientes', async (req, res) => {
     }
 });
 
-/**
- * Get all clientes
- * GET /api/clientes
- */
-router.get('/clientes', async (req, res) => {
-    try {
-        const clientes = await clienteService.getAllClientes();
-        res.json({ success: true, data: clientes });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * Get cliente by id
- * GET /api/clientes/:id
- */
-router.get('/clientes/:id', async (req, res) => {
-    try {
-        const cliente = await clienteService.getClienteById(req.params.id);
-        res.json({ success: true, data: cliente });
-    } catch (error) {
-        res.status(404).json({ success: false, error: error.message });
-    }
-});
 
 /**
  * Update cliente
  * PUT /api/clientes/:id
  */
-router.put('/clientes/:id', async (req, res) => {
+router.put('/queries/q13/:id', async (req, res) => {
     try {
         const cliente = await clienteService.updateCliente(req.params.id, req.body);
         res.json({ success: true, data: cliente });
@@ -227,7 +202,8 @@ router.put('/clientes/:id', async (req, res) => {
  * Delete cliente
  * DELETE /api/clientes/:id
  */
-router.delete('/clientes/:id', async (req, res) => {
+
+router.delete('/queries/q13/:id', async (req, res) => {
     try {
         const result = await clienteService.deleteCliente(req.params.id);
         res.json({ success: true, data: result });
@@ -236,31 +212,8 @@ router.delete('/clientes/:id', async (req, res) => {
     }
 });
 
-/**
- * Add vehicle to cliente
- * POST /api/clientes/:id/vehiculos
- */
-router.post('/clientes/:id/vehiculos', async (req, res) => {
-    try {
-        const cliente = await clienteService.addVehicleToCliente(req.params.id, req.body);
-        res.json({ success: true, data: cliente });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
-/**
- * Remove vehicle from cliente
- * DELETE /api/clientes/:id/vehiculos/:vehiculoId
- */
-router.delete('/clientes/:id/vehiculos/:vehiculoId', async (req, res) => {
-    try {
-        const cliente = await clienteService.removeVehicleFromCliente(req.params.id, req.params.vehiculoId);
-        res.json({ success: true, data: cliente });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+
 
 // ============================================================
 // Q14: ALTA DE SINIESTROS
@@ -270,7 +223,7 @@ router.delete('/clientes/:id/vehiculos/:vehiculoId', async (req, res) => {
  * Create new siniestro
  * POST /api/siniestros
  */
-router.post('/siniestros', async (req, res) => {
+router.post('/queries/q14', async (req, res) => {
     try {
         const siniestro = await siniestroService.createSiniestro(req.body);
         res.status(201).json({ success: true, data: siniestro });
@@ -279,44 +232,10 @@ router.post('/siniestros', async (req, res) => {
     }
 });
 
-/**
- * Get all siniestros
- * GET /api/siniestros
- */
-router.get('/siniestros', async (req, res) => {
-    try {
-        const siniestros = await siniestroService.getAllSiniestros();
-        res.json({ success: true, data: siniestros });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
-/**
- * Get siniestro by id
- * GET /api/siniestros/:id
- */
-router.get('/siniestros/:id', async (req, res) => {
-    try {
-        const siniestro = await siniestroService.getSiniestroById(req.params.id);
-        res.json({ success: true, data: siniestro });
-    } catch (error) {
-        res.status(404).json({ success: false, error: error.message });
-    }
-});
 
-/**
- * Update siniestro estado
- * PATCH /api/siniestros/:id/estado
- */
-router.patch('/siniestros/:id/estado', async (req, res) => {
-    try {
-        const siniestro = await siniestroService.updateSiniestroEstado(req.params.id, req.body.estado);
-        res.json({ success: true, data: siniestro });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+
+
 
 // ============================================================
 // Q15: EMISIÓN DE PÓLIZAS
@@ -326,7 +245,7 @@ router.patch('/siniestros/:id/estado', async (req, res) => {
  * Create new poliza (with validation)
  * POST /api/polizas
  */
-router.post('/polizas', async (req, res) => {
+router.post('/queries/q15', async (req, res) => {
     try {
         const poliza = await polizaService.createPoliza(req.body);
         res.status(201).json({ success: true, data: poliza });
@@ -335,56 +254,6 @@ router.post('/polizas', async (req, res) => {
     }
 });
 
-/**
- * Get all polizas
- * GET /api/polizas
- */
-router.get('/polizas', async (req, res) => {
-    try {
-        const polizas = await polizaService.getAllPolizas();
-        res.json({ success: true, data: polizas });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
-/**
- * Get poliza by nro_poliza
- * GET /api/polizas/:nro
- */
-router.get('/polizas/:nro', async (req, res) => {
-    try {
-        const poliza = await polizaService.getPolizaByNro(req.params.nro);
-        res.json({ success: true, data: poliza });
-    } catch (error) {
-        res.status(404).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * Get polizas by cliente
- * GET /api/polizas/cliente/:id
- */
-router.get('/polizas/cliente/:id', async (req, res) => {
-    try {
-        const polizas = await polizaService.getPolizasByCliente(req.params.id);
-        res.json({ success: true, data: polizas });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * Update poliza estado
- * PATCH /api/polizas/:nro/estado
- */
-router.patch('/polizas/:nro/estado', async (req, res) => {
-    try {
-        const poliza = await polizaService.updatePolizaEstado(req.params.nro, req.body.estado);
-        res.json({ success: true, data: poliza });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
 module.exports = router;

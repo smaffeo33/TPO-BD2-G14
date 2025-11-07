@@ -35,30 +35,13 @@ app.get('/', (req, res) => {
                 q9: 'GET /api/queries/q9 - Pólizas activas ordenadas',
                 q10: 'GET /api/queries/q10 - Pólizas suspendidas con cliente',
                 q11: 'GET /api/queries/q11 - Clientes con varios vehículos',
-                q12: 'GET /api/queries/q12 - Agentes con cantidad de siniestros'
+                q12: 'GET /api/queries/q12 - Agentes con cantidad de siniestros',
+                q13: 'POST /api/queries/q13: - Agregar cliente',
+                q13Put: 'PUT /api/queries/q13:id - Actualizar cliente',
+                q13Delete: 'DELETE /api/queries/q13:id - Eliminar cliente',
+                q14: 'POST /api/queries/q14 - Alta de nuevos siniestros',
+                q15: 'POST /api/queries/q15 - Emision de nuevas polizas'
             },
-            clientes: {
-                list: 'GET /api/clientes',
-                get: 'GET /api/clientes/:id',
-                create: 'POST /api/clientes',
-                update: 'PUT /api/clientes/:id',
-                delete: 'DELETE /api/clientes/:id',
-                addVehicle: 'POST /api/clientes/:id/vehiculos',
-                removeVehicle: 'DELETE /api/clientes/:id/vehiculos/:vehiculoId'
-            },
-            siniestros: {
-                list: 'GET /api/siniestros',
-                get: 'GET /api/siniestros/:id',
-                create: 'POST /api/siniestros',
-                updateEstado: 'PATCH /api/siniestros/:id/estado'
-            },
-            polizas: {
-                list: 'GET /api/polizas',
-                get: 'GET /api/polizas/:nro',
-                byCliente: 'GET /api/polizas/cliente/:id',
-                create: 'POST /api/polizas',
-                updateEstado: 'PATCH /api/polizas/:nro/estado'
-            }
         }
     });
 });
