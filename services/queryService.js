@@ -3,6 +3,21 @@ const { redisClient } = require('../config/db.redis');
 const Cliente = require('../models/Cliente');
 const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
+const Agente = require('../models/Agente');
+
+const Q5_HASH_KEY = 'counts:agente:polizas';
+const Q5_LOCK_KEY = 'lock:cache:repopulating_q5';
+const Q5_NEO4J_QUERY = `
+    MATCH (a:Agente {activo: true})-[:GESTIONA]->(p:Poliza)
+    RETURN a.id_agente AS id, count(p) AS total
+`;
+// const Q12_HASH_KEY = 'counts:agente:siniestros';
+// const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
+// const Q12_NEO4J_QUERY = ...;
+
+
+const LOCK_TTL = 40; // Lock expira en 20 segundos
+
 
 /**
  * Q1: Clientes activos con sus pólizas vigentes (array embebido)
@@ -144,49 +159,128 @@ async function getClientesSinPolizasActivas() {
 
 /**
  * Q5: Agentes activos con cantidad de pólizas asignadas
- * Base: Redis (con fallback a Neo4j)
+ * Base: Redis (con fallback a Neo4j y sincronización)
  */
 async function getAgentesConCantidadPolizas() {
-    // Try Redis first
-    const counts = await redisClient.hGetAll('counts:agente:polizas');
+    try {
+        // Asegurarnos que el caché esté "caliente".
+        // Esta función (definida arriba) chequeará si Q5_HASH_KEY existe.
+        // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
+        // Si el lock está ocupado, esperará.
+        await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
 
-    if (Object.keys(counts).length > 0) {
-        // Cache hit
-        return Object.entries(counts).map(([id_agente, count]) => ({
-            id_agente,
-            cantidad_polizas: parseInt(count, 10)
-        }));
+        // Ahora que el caché está caliente, simplemente lo leemos.
+        // Toda la lógica de "Cache miss" y repoblación ya no está aquí,
+        // está centralizada en 'ensureCacheIsWarm'.
+        const counts = await redisClient.hGetAll(Q5_HASH_KEY);
+
+        // Convertir la respuesta de Redis en el formato de array esperado
+        return Object.entries(counts)
+            .filter(([key, _]) => key !== '_placeholder') // Filtrar el placeholder si existe
+            .map(([id_agente, count]) => ({
+                id_agente,
+                cantidad_polizas: parseInt(count, 10)
+            }));
+
+    } catch (error) {
+        // Si ensureCacheIsWarm falla (ej. timeout del lock), lanzamos un error.
+        console.error('Error en getAgentesConCantidadPolizas:', error.message);
+        throw new Error('Could not retrieve agent counts');
     }
+}
 
-    // Cache miss - calculate from Neo4j
+
+/**
+ * Función helper interna para poblar el caché desde Neo4j.
+ * ESTA FUNCIÓN ASUME QUE QUIEN LA LLAMA YA TIENE EL LOCK.
+ */
+async function _populateCacheFromNeo4j(hashKey, neo4jQuery) {
+    console.log(`(Helper) Poblando caché para ${hashKey} desde Neo4j...`);
     const session = getNeo4jSession();
     try {
-        const result = await session.run(`
-            MATCH (a:Agente {activo: true})-[:GESTIONA]->(p:Poliza)
-            RETURN a.id_agente AS id_agente, a.nombre AS nombre, count(p) AS total
-            ORDER BY total DESC, a.nombre
-        `);
-
+        const result = await session.run(neo4jQuery);
         const data = result.records.map(record => ({
-            id_agente: record.get('id_agente'),
-            nombre: record.get('nombre'),
-            cantidad_polizas: record.get('total').toNumber()
+            id: record.get('id'),
+            total: record.get('total').toNumber()
         }));
 
-        // Populate Redis for next time
+        // Limpiamos la clave (por si acaso) y la poblamos de cero
+        const multi = redisClient.multi();
+        multi.del(hashKey); // Empezar de limpio
         if (data.length > 0) {
-            const multi = redisClient.multi();
             for (const item of data) {
-                multi.hSet('counts:agente:polizas', item.id_agente, item.cantidad_polizas);
+                multi.hSet(hashKey, item.id, item.total);
             }
-            await multi.exec();
+        } else {
+            // Creamos un hash vacío con expiración corta
+            // para evitar que se calcule esto todo el tiempo si no hay datos.
+            multi.hSet(hashKey, '_placeholder', 'true');
+            multi.expire(hashKey, 300); // Expira en 5 minutos
         }
-
-        return data;
+        await multi.exec();
+        console.log(`(Helper) Caché ${hashKey} poblado.`);
+    } catch (e) {
+        console.error(`(Helper) Error poblando caché ${hashKey}:`, e);
     } finally {
         await session.close();
     }
 }
+
+/**
+ * Función helper de sincronización.
+ * Asegura que el caché HASH exista antes de continuar.
+ * Es llamada por Q5 (lectura) y Q15 (escritura).
+ */
+async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
+    // 1. Ver si el caché existe
+    const cacheExists = await redisClient.exists(hashKey);
+    if (cacheExists) {
+        return true; // El caché existe, podemos continuar
+    }
+
+    // 2. El caché no existe.
+    console.warn(`(ensureCacheIsWarm) Cache MISS en ${hashKey}. Esperando para adquirir lock...`);
+    let lockAcquired = false;
+    while (!lockAcquired) {
+        // Intentamos obtener el lock ATÓMICAMENTE con el TTL
+        lockAcquired = await redisClient.set(lockKey, 'true', {
+            NX: true,
+            EX: LOCK_TTL
+        });
+
+        if (!lockAcquired) {
+            // No lo obtuvimos, esperamos y reintentamos
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Si mientras esperábamos, otro hilo ya pobló el caché, salimos y evitamos el trabajo.
+            const cacheNowExists = await redisClient.exists(hashKey);
+            if (cacheNowExists) {
+                console.log(`(ensureCacheIsWarm) El caché fue poblado por otro hilo mientras esperábamos. Continuando.`);
+                return true;
+            }
+        }
+    }
+
+    console.log(`(ensureCacheIsWarm) Lock adquirido. Verificando caché y repoblando si es necesario...`);
+    try {
+        // 4. Doble Verificación
+        const cacheNowExists = await redisClient.exists(hashKey);
+        if (!cacheNowExists) {
+            await _populateCacheFromNeo4j(hashKey, neo4jQuery);
+        }
+    } catch (e) {
+        console.error(`(ensureCacheIsWarm) Error durante repoblación:`, e);
+    } finally {
+        // 5. Liberamos el lock
+        await redisClient.del(lockKey);
+        console.log(`(ensureCacheIsWarm) Lock liberado.`);
+    }
+    return true;
+}
+
+
+
+
 
 /**
  * Q6: Pólizas vencidas con el nombre del cliente

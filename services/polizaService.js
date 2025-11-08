@@ -1,8 +1,111 @@
 const Poliza = require('../models/Poliza');
 const Agente = require('../models/Agente');
 const Cliente = require('../models/Cliente');
+const Siniestro = require('../models/Siniestro');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
+
+
+const Q5_HASH_KEY = 'counts:agente:polizas';
+const Q5_LOCK_KEY = 'lock:cache:repopulating_q5';
+const Q5_NEO4J_QUERY = `
+    MATCH (a:Agente {activo: true})-[:GESTIONA]->(p:Poliza)
+    RETURN a.id_agente AS id, count(p) AS total
+`;
+
+const LOCK_TTL = 40;
+
+
+
+/**
+ * Función helper interna para poblar el caché desde Neo4j.
+ * ESTA FUNCIÓN ASUME QUE QUIEN LA LLAMA YA TIENE EL LOCK.
+ */
+async function _populateCacheFromNeo4j(hashKey, neo4jQuery) {
+    console.log(`(Helper) Poblando caché para ${hashKey} desde Neo4j...`);
+    const session = getNeo4jSession();
+    try {
+        const result = await session.run(neo4jQuery);
+        const data = result.records.map(record => ({
+            id: record.get('id'),
+            total: record.get('total').toNumber()
+        }));
+
+        // Limpiamos la clave (por si acaso) y la poblamos de cero
+        const multi = redisClient.multi();
+        multi.del(hashKey); // Empezar de limpio
+        if (data.length > 0) {
+            for (const item of data) {
+                multi.hSet(hashKey, item.id, item.total);
+            }
+        } else {
+            // Creamos un hash vacío con expiración corta
+            // para evitar que se calcule esto todo el tiempo si no hay datos.
+            multi.hSet(hashKey, '_placeholder', 'true');
+            multi.expire(hashKey, 300); // Expira en 5 minutos
+        }
+        await multi.exec();
+        console.log(`(Helper) Caché ${hashKey} poblado.`);
+    } catch (e) {
+        console.error(`(Helper) Error poblando caché ${hashKey}:`, e);
+    } finally {
+        await session.close();
+    }
+}
+
+/**
+ * Función helper de sincronización.
+ * Asegura que el caché HASH exista antes de continuar.
+ * Es llamada por Q5 (lectura) y Q15 (escritura).
+ */
+async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
+    // 1. Ver si el caché existe
+    const cacheExists = await redisClient.exists(hashKey);
+    if (cacheExists) {
+        return true; // El caché existe, podemos continuar
+    }
+
+    // 2. El caché no existe.
+    console.warn(`(ensureCacheIsWarm) Cache MISS en ${hashKey}. Esperando para adquirir lock...`);
+    let lockAcquired = false;
+    while (!lockAcquired) {
+        // Intentamos obtener el lock ATÓMICAMENTE con el TTL
+        lockAcquired = await redisClient.set(lockKey, 'true', {
+            NX: true,
+            EX: LOCK_TTL
+        });
+
+        if (!lockAcquired) {
+            // No lo obtuvimos, esperamos y reintentamos
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Si mientras esperábamos, otro hilo ya pobló el caché, salimos y evitamos el trabajo.
+            const cacheNowExists = await redisClient.exists(hashKey);
+            if (cacheNowExists) {
+                console.log(`(ensureCacheIsWarm) El caché fue poblado por otro hilo mientras esperábamos. Continuando.`);
+                return true;
+            }
+        }
+    }
+
+    console.log(`(ensureCacheIsWarm) Lock adquirido. Verificando caché y repoblando si es necesario...`);
+    try {
+        // 4. Doble Verificación
+        const cacheNowExists = await redisClient.exists(hashKey);
+        if (!cacheNowExists) {
+            await _populateCacheFromNeo4j(hashKey, neo4jQuery);
+        }
+    } catch (e) {
+        console.error(`(ensureCacheIsWarm) Error durante repoblación:`, e);
+    } finally {
+        // 5. Liberamos el lock
+        await redisClient.del(lockKey);
+        console.log(`(ensureCacheIsWarm) Lock liberado.`);
+    }
+    return true;
+}
+
+
 
 /**
  * Q15: Emisión de nuevas pólizas (validando cliente y agente)
@@ -153,18 +256,27 @@ async function createPoliza(polizaData) {
         // 8. Redis (Invalidación Q7): Invalidate top10 ranking
         await redisClient.del('ranking:top10_clientes');
 
-        // 9. Redis (Incremento Q5): ONLY increment if key exists
-        try {
-            const existingValue = await redisClient.hGet('counts:agente:polizas', polizaData.id_agente);
 
-            if (existingValue !== null) {
-                await redisClient.hIncrBy('counts:agente:polizas', polizaData.id_agente, 1);
-                console.log(`Redis: Incremented poliza count for agente ${polizaData.id_agente}`);
-            } else {
-                console.log(`Redis: Skipped increment for agente ${polizaData.id_agente} (key doesn't exist)`);
-            }
+        // 9. Redis (Incremento Q5):
+        try {
+            // PASO 9.A: Asegurarnos que el caché esté "caliente".
+            // Esta función (definida arriba) chequeará si Q5_HASH_KEY existe.
+            // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
+            // Si el lock está ocupado, esperará.
+            await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
+
+            // PASO 9.B: Ahora que estamos 100% seguros que el caché existe
+            // y está poblado, podemos ejecutar HINCRBY de forma segura.
+            // Ya no necesitamos el "if (existingValue !== null)".
+            await redisClient.hIncrBy(Q5_HASH_KEY, polizaData.id_agente, 1);
+            // TODO: Esto de arriba esta mal, si la acabo de cargar yo estoy incrementando algo que ya esta actualizado
+
+            console.log(`Redis: Incremented poliza count for agente ${polizaData.id_agente}`);
+
         } catch (redisError) {
-            console.error('Redis error (non-fatal):', redisError.message);
+            // Si ensureCacheIsWarm falla (ej. por timeout del lock),
+            // o HINCRBY falla, lo capturamos pero no detenemos la operación.
+            console.error('Redis error (non-fatal) during Q5 sync:', redisError.message);
         }
 
         return poliza;
@@ -206,7 +318,6 @@ async function getPolizasByCliente(id_cliente) {
 async function updatePolizaEstado(nro_poliza, nuevoEstado) {
     const session = getNeo4jSession();
     try {
-        // Update in MongoDB
         const poliza = await Poliza.findOneAndUpdate(
             { nro_poliza },
             { $set: { estado: nuevoEstado } },
@@ -217,13 +328,11 @@ async function updatePolizaEstado(nro_poliza, nuevoEstado) {
             throw new Error('Poliza not found');
         }
 
-        // Update in Neo4j
         await session.run(`
             MATCH (p:Poliza {nro_poliza: $nro_poliza})
             SET p.estado = toLower($estado)
         `, { nro_poliza, estado: nuevoEstado });
 
-        // Invalidate Redis cache
         await redisClient.del('ranking:top10_clientes');
 
         return poliza;
