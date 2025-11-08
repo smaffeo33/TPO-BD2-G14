@@ -45,7 +45,7 @@ async function createPoliza(polizaData) {
         }
 
         // 2. MongoDB (Lectura): Get Agente data to embed
-        const agente = await Agente.findOne({ id_agente: polizaData.id_agente }).lean();
+        const agente = await Agente.findOne({ _id: polizaData.id_agente }).lean();
         if (!agente) {
             throw new Error('Agente not found in MongoDB');
         }
@@ -56,7 +56,7 @@ async function createPoliza(polizaData) {
         let oldAutoPolizaEstado = null;
 
         if (isAutoPolicy) {
-            const cliente = await Cliente.findOne({ id_cliente: polizaData.id_cliente }).lean();
+            const cliente = await Cliente.findOne({ _id: polizaData.id_cliente }).lean();
             if (cliente && cliente.poliza_auto_vigente) {
                 oldAutoPolizaNro = cliente.poliza_auto_vigente.nro_poliza;
                 // Determine new estado based on current policy status
@@ -65,10 +65,11 @@ async function createPoliza(polizaData) {
             }
         }
 
+
+
         // 4. MongoDB (Escritura): Create the new Poliza
         const poliza = new Poliza({
-            nro_poliza: polizaData.nro_poliza,
-            cliente_id: polizaData.id_cliente,
+            id_cliente: polizaData.id_cliente,
             tipo: polizaData.tipo,
             fecha_inicio: polizaData.fecha_inicio,
             fecha_fin: polizaData.fecha_fin,
@@ -76,7 +77,7 @@ async function createPoliza(polizaData) {
             cobertura_total: polizaData.cobertura_total,
             estado: polizaData.estado || 'Vigente',
             agente: {
-                id_agente: agente.id_agente,
+                id_agente: agente._id,
                 nombre: agente.nombre,
                 apellido: agente.apellido,
                 matricula: agente.matricula
@@ -87,7 +88,7 @@ async function createPoliza(polizaData) {
         // 5. If Auto policy, update Cliente's poliza_auto_vigente (OVERWRITE)
         if (isAutoPolicy) {
             await Cliente.findOneAndUpdate(
-                { id_cliente: polizaData.id_cliente },
+                { _id: polizaData.id_cliente },
                 {
                     $set: {
                         poliza_auto_vigente: {
@@ -153,7 +154,7 @@ async function createPoliza(polizaData) {
 
             // Also update in MongoDB
             await Poliza.findOneAndUpdate(
-                { nro_poliza: oldAutoPolizaNro },
+                { _id: oldAutoPolizaNro },
                 { $set: { estado: oldAutoPolizaEstado } }
             );
 
@@ -210,14 +211,14 @@ async function getPolizaByNro(nro_poliza) {
  * Get all polizas
  */
 async function getAllPolizas() {
-    return await Poliza.find().sort({ fecha_inicio: -1 }).lean();
+    return Poliza.find().sort({fecha_inicio: -1}).lean();
 }
 
 /**
  * Get polizas by cliente
  */
 async function getPolizasByCliente(id_cliente) {
-    return await Poliza.find({ cliente_id: id_cliente }).sort({ fecha_inicio: -1 }).lean();
+    return Poliza.find({id_cliente: id_cliente}).sort({fecha_inicio: -1}).lean();
 }
 
 /**

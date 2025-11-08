@@ -1,6 +1,9 @@
 const Cliente = require('../models/Cliente');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
+const {mongoose} = require("../config/db.mongo");
+
+
 
 /**
  * Q13: ABM de Clientes
@@ -15,7 +18,6 @@ async function createCliente(clienteData) {
     try {
         // 1. MongoDB: Create cliente
         const cliente = new Cliente({
-            id_cliente: clienteData.id_cliente,
             nombre: clienteData.nombre,
             apellido: clienteData.apellido,
             dni: clienteData.dni,
