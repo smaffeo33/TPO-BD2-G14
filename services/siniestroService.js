@@ -1,5 +1,6 @@
 const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
+const Cliente = require('../models/Cliente');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
 
@@ -22,6 +23,13 @@ async function createSiniestro(siniestroData) {
 
         const agenteId = poliza.agente.id_agente;
 
+        // 1b. MongoDB (Lectura): Obtener Cliente usando el ID de la póliza
+        // (Asegúrate de tener importado tu modelo 'Cliente')
+        const cliente = await Cliente.findOne({ id_cliente: poliza.cliente_id }).lean();
+        if (!cliente) {
+            throw new Error(`Cliente ${poliza.cliente_id} asociado a la póliza no fue encontrado.`);
+        }
+
         // 2. MongoDB (Escritura): Create the siniestro with poliza_snapshot
         const siniestro = new Siniestro({
             id_siniestro: siniestroData.id_siniestro,
@@ -37,8 +45,8 @@ async function createSiniestro(siniestroData) {
                 fecha_vigencia_fin: poliza.fecha_fin,
                 cliente: {
                     id_cliente: poliza.cliente_id,
-                    nombre: 'Cliente', // We would need to fetch from Cliente collection
-                    contacto: 'email@example.com'
+                    nombre: `${cliente.nombre} ${cliente.apellido}`,
+                    contacto: cliente.email
                 },
                 agente: {
                     id_agente: poliza.agente.id_agente,
