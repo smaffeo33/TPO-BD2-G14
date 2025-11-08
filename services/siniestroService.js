@@ -2,7 +2,14 @@ const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
-const { ensureCacheIsWarm, Q12_HASH_KEY, Q12_LOCK_KEY, Q12_NEO4J_QUERY } = require('./queryService');
+const { ensureCacheIsWarm } = require('./cacheSync');
+
+const Q12_HASH_KEY = 'counts:agente:siniestros';
+const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
+const Q12_NEO4J_QUERY = `
+    MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
+    RETURN a.id_agente AS id, count(s) AS total
+`;
 
 /**
  * Q14: Alta de nuevos siniestros
