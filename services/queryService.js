@@ -311,6 +311,7 @@ async function getPolizasVencidas() {
  * Q7: Top 10 clientes por cobertura total
  * Base: Redis (con fallback a Neo4j)
  */
+//TODO: ver si ponemos locks o lo hacemos de una en neo
 async function getTop10ClientesPorCobertura() {
     // Try Redis first
     const cached = await redisClient.get('ranking:top10_clientes');
@@ -324,7 +325,7 @@ async function getTop10ClientesPorCobertura() {
     try {
         const result = await session.run(`
             MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
-            WHERE p.estado = 'vigente' OR p.estado = 'activa'
+            WHERE p.estado = 'activa'
             RETURN c.nombre AS cliente_nombre, sum(p.cobertura_total) AS total_cobertura
             ORDER BY total_cobertura DESC
             LIMIT 10
@@ -372,7 +373,7 @@ async function getSiniestrosAccidenteUltimoAnio() {
  */
 async function getPolizasActivasOrdenadas() {
     const polizas = await Poliza.find({
-        estado: { $in: ['Activa', 'activa', 'Vigente', 'vigente'] }
+        estado: { $in: ['Activa', 'activa'] }
     }).sort({ fecha_inicio: 1 }).lean();
 
     return polizas.map(p => ({
