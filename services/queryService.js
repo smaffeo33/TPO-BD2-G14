@@ -11,12 +11,15 @@ const Q5_NEO4J_QUERY = `
     MATCH (a:Agente {activo: true})-[:GESTIONA]->(p:Poliza)
     RETURN a.id_agente AS id, count(p) AS total
 `;
-// const Q12_HASH_KEY = 'counts:agente:siniestros';
-// const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
-// const Q12_NEO4J_QUERY = ...;
 
+const Q12_HASH_KEY = 'counts:agente:siniestros';
+const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
+const Q12_NEO4J_QUERY = `
+    MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
+    RETURN a.id_agente AS id, count(s) AS total
+`;
 
-const LOCK_TTL = 40; // Lock expira en 20 segundos
+const LOCK_TTL = 40;
 
 
 /**
@@ -430,46 +433,27 @@ async function getClientesConVariosVehiculos() {
 
 /**
  * Q12: Agentes y cantidad de siniestros asociados
- * Base: Redis (con fallback a Neo4j)
+ * Base: Redis (con fallback a Neo4j y sincronización)
  */
 async function getAgentesConCantidadSiniestros() {
-    // Try Redis first
-    const counts = await redisClient.hGetAll('counts:agente:siniestros');
-
-    if (Object.keys(counts).length > 0) {
-        return Object.entries(counts).map(([id_agente, count]) => ({
-            id_agente,
-            cantidad_siniestros: parseInt(count, 10)
-        }));
-    }
-
-    // Cache miss - calculate from Neo4j
-    const session = getNeo4jSession();
     try {
-        const result = await session.run(`
-            MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
-            RETURN a.id_agente AS id_agente, a.nombre AS nombre, count(s) AS total
-            ORDER BY total DESC, a.nombre
-        `);
+        // Asegurarnos que el caché esté "caliente"
+        await ensureCacheIsWarm(Q12_HASH_KEY, Q12_LOCK_KEY, Q12_NEO4J_QUERY);
 
-        const data = result.records.map(record => ({
-            id_agente: record.get('id_agente'),
-            nombre: record.get('nombre'),
-            cantidad_siniestros: record.get('total').toNumber()
-        }));
+        // Leer del caché caliente
+        const counts = await redisClient.hGetAll(Q12_HASH_KEY);
 
-        // Populate Redis
-        if (data.length > 0) {
-            const multi = redisClient.multi();
-            for (const item of data) {
-                multi.hSet('counts:agente:siniestros', item.id_agente, item.cantidad_siniestros);
-            }
-            await multi.exec();
-        }
+        // Convertir la respuesta de Redis en el formato esperado
+        return Object.entries(counts)
+            .filter(([key, _]) => key !== '_placeholder')
+            .map(([id_agente, count]) => ({
+                id_agente,
+                cantidad_siniestros: parseInt(count, 10)
+            }));
 
-        return data;
-    } finally {
-        await session.close();
+    } catch (error) {
+        console.error('Error en getAgentesConCantidadSiniestros:', error.message);
+        throw new Error('Could not retrieve agent siniestro counts');
     }
 }
 
@@ -485,5 +469,10 @@ module.exports = {
     getPolizasActivasOrdenadas,
     getPolizasSuspendidasConCliente,
     getClientesConVariosVehiculos,
-    getAgentesConCantidadSiniestros
+    getAgentesConCantidadSiniestros,
+    // Export for use in siniestroService
+    ensureCacheIsWarm,
+    Q12_HASH_KEY,
+    Q12_LOCK_KEY,
+    Q12_NEO4J_QUERY
 };
