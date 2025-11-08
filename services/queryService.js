@@ -276,14 +276,21 @@ async function getPolizasActivasOrdenadas() {
         estado: { $in: ['Activa', 'activa'] }
     }).sort({ fecha_inicio: 1 }).lean();
 
-    return polizas.map(p => ({
-        nro_poliza: p.nro_poliza,
-        tipo: p.tipo,
-        fecha_inicio: p.fecha_inicio,
-        fecha_fin: p.fecha_fin,
-        agente: `${p.agente.nombre} ${p.agente.apellido}`,
-        prima_mensual: p.prima_mensual
-    }));
+    return polizas.map(p => {
+        const agenteNombre = [p.agente?.nombre, p.agente?.apellido]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+
+        return {
+            nro_poliza: p.nro_poliza,
+            tipo: p.tipo,
+            fecha_inicio: p.fecha_inicio,
+            fecha_fin: p.fecha_fin,
+            agente: agenteNombre || 'Sin asignar',
+            prima_mensual: p.prima_mensual
+        };
+    });
 }
 
 /**
