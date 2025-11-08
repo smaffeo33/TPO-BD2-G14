@@ -3,6 +3,25 @@ const { redisClient } = require('../config/db.redis');
 const Cliente = require('../models/Cliente');
 const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
+const Agente = require('../models/Agente');
+const { ensureCacheIsWarm, computeAndCacheWithLock } = require('./cacheSync');
+
+const Q5_HASH_KEY = 'counts:agente:polizas';
+const Q5_LOCK_KEY = 'lock:cache:repopulating_q5';
+const Q5_NEO4J_QUERY = `
+    MATCH (a:Agente {activo: true})-[:GESTIONA]->(p:Poliza)
+    RETURN a.id_agente AS id, count(p) AS total
+`;
+
+const Q12_HASH_KEY = 'counts:agente:siniestros';
+const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
+const Q12_NEO4J_QUERY = `
+    MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
+    RETURN a.id_agente AS id, count(s) AS total
+`;
+
+const Q7_CACHE_KEY = 'ranking:top10_clientes';
+const Q7_LOCK_KEY = 'lock:cache:top10_clientes';
 
 /**
  * Q1: Clientes activos con sus pólizas vigentes (array embebido)
@@ -92,7 +111,7 @@ async function getVehiculosAsegurados() {
         },
         {
             // 3. Filtrar solo los vehículos que están asegurados
-            //   TODO: yo eliminaria este booleano, no tiene sentido, ya nos fijamos en cliente si hay póliza. Si hay claramente, está asegurado
+            //   TODO: yo eliminaria este booleano, no tiene sentido, ya nos fijamos en cliente si hay póliza. Si hay claramente, está asegurado --> fijarnos en los datasets si hay alguna inconsistencia
             $match: {
                 'vehiculos.asegurado': true
             }
@@ -125,11 +144,10 @@ async function getClientesSinPolizasActivas() {
     try {
         const result = await session.run(`
             MATCH (c:Cliente)
-            WHERE NOT (c)-[:TIENE_POLIZA]->(:Poliza)
-               OR NOT EXISTS {
-                   MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
-                   WHERE p.estado = 'vigente' OR p.estado = 'activa'
-               }
+            WHERE NOT EXISTS {
+                MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
+                WHERE p.estado = 'vigente' OR p.estado = 'activa'
+            }
             RETURN c.id_cliente AS id_cliente, c.nombre AS nombre, c.activo AS activo
             ORDER BY c.nombre
         `);
@@ -145,47 +163,33 @@ async function getClientesSinPolizasActivas() {
 
 /**
  * Q5: Agentes activos con cantidad de pólizas asignadas
- * Base: Redis (con fallback a Neo4j)
+ * Base: Redis (con fallback a Neo4j y sincronización)
  */
 async function getAgentesConCantidadPolizas() {
-    // Try Redis first
-    const counts = await redisClient.hGetAll('counts:agente:polizas');
-
-    if (Object.keys(counts).length > 0) {
-        // Cache hit
-        return Object.entries(counts).map(([id_agente, count]) => ({
-            id_agente,
-            cantidad_polizas: parseInt(count, 10)
-        }));
-    }
-
-    // Cache miss - calculate from Neo4j
-    const session = getNeo4jSession();
     try {
-        const result = await session.run(`
-            MATCH (a:Agente {activo: true})-[:GESTIONA]->(p:Poliza)
-            RETURN a.id_agente AS id_agente, a.nombre AS nombre, count(p) AS total
-            ORDER BY total DESC, a.nombre
-        `);
+        // Asegurarnos que el caché esté "caliente".
+        // Esta función (definida arriba) chequeará si Q5_HASH_KEY existe.
+        // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
+        // Si el lock está ocupado, esperará.
+        await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
 
-        const data = result.records.map(record => ({
-            id_agente: record.get('id_agente'),
-            nombre: record.get('nombre'),
-            cantidad_polizas: record.get('total').toNumber()
-        }));
+        // Ahora que el caché está caliente, simplemente lo leemos.
+        // Toda la lógica de "Cache miss" y repoblación ya no está aquí,
+        // está centralizada en 'ensureCacheIsWarm'.
+        const counts = await redisClient.hGetAll(Q5_HASH_KEY);
 
-        // Populate Redis for next time
-        if (data.length > 0) {
-            const multi = redisClient.multi();
-            for (const item of data) {
-                multi.hSet('counts:agente:polizas', item.id_agente, item.cantidad_polizas);
-            }
-            await multi.exec();
-        }
+        // Convertir la respuesta de Redis en el formato de array esperado
+        return Object.entries(counts)
+            .filter(([key, _]) => key !== '_placeholder') // Filtrar el placeholder si existe
+            .map(([id_agente, count]) => ({
+                id_agente,
+                cantidad_polizas: parseInt(count, 10)
+            }));
 
-        return data;
-    } finally {
-        await session.close();
+    } catch (error) {
+        // Si ensureCacheIsWarm falla (ej. timeout del lock), lanzamos un error.
+        console.error('Error en getAgentesConCantidadPolizas:', error.message);
+        throw new Error('Could not retrieve agent counts');
     }
 }
 
@@ -217,38 +221,28 @@ async function getPolizasVencidas() {
 /**
  * Q7: Top 10 clientes por cobertura total
  * Base: Redis (con fallback a Neo4j)
+ * Usa lock para evitar race condition de stale write durante invalidación
  */
 async function getTop10ClientesPorCobertura() {
-    // Try Redis first
-    const cached = await redisClient.get('ranking:top10_clientes');
+    return computeAndCacheWithLock(Q7_CACHE_KEY, Q7_LOCK_KEY, async () => {
+        const session = getNeo4jSession();
+        try {
+            const result = await session.run(`
+                MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
+                WHERE p.estado = 'activa'
+                RETURN c.nombre AS cliente_nombre, sum(p.cobertura_total) AS total_cobertura
+                ORDER BY total_cobertura DESC
+                LIMIT 10
+            `);
 
-    if (cached) {
-        return JSON.parse(cached);
-    }
-
-    // Cache miss - calculate from Neo4j
-    const session = getNeo4jSession();
-    try {
-        const result = await session.run(`
-            MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
-            WHERE p.estado = 'vigente' OR p.estado = 'activa'
-            RETURN c.nombre AS cliente_nombre, sum(p.cobertura_total) AS total_cobertura
-            ORDER BY total_cobertura DESC
-            LIMIT 10
-        `);
-
-        const data = result.records.map(record => ({
-            cliente_nombre: record.get('cliente_nombre'),
-            total_cobertura: record.get('total_cobertura')
-        }));
-
-        // Store in Redis
-        await redisClient.set('ranking:top10_clientes', JSON.stringify(data));
-
-        return data;
-    } finally {
-        await session.close();
-    }
+            return result.records.map(record => ({
+                cliente_nombre: record.get('cliente_nombre'),
+                total_cobertura: record.get('total_cobertura')
+            }));
+        } finally {
+            await session.close();
+        }
+    });
 }
 
 /**
@@ -279,17 +273,24 @@ async function getSiniestrosAccidenteUltimoAnio() {
  */
 async function getPolizasActivasOrdenadas() {
     const polizas = await Poliza.find({
-        estado: { $in: ['Activa', 'activa', 'Vigente', 'vigente'] }
+        estado: { $in: ['Activa', 'activa'] }
     }).sort({ fecha_inicio: 1 }).lean();
 
-    return polizas.map(p => ({
-        nro_poliza: p.nro_poliza,
-        tipo: p.tipo,
-        fecha_inicio: p.fecha_inicio,
-        fecha_fin: p.fecha_fin,
-        agente: `${p.agente.nombre} ${p.agente.apellido}`,
-        prima_mensual: p.prima_mensual
-    }));
+    return polizas.map(p => {
+        const agenteNombre = [p.agente?.nombre, p.agente?.apellido]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+
+        return {
+            nro_poliza: p.nro_poliza,
+            tipo: p.tipo,
+            fecha_inicio: p.fecha_inicio,
+            fecha_fin: p.fecha_fin,
+            agente: agenteNombre || 'Sin asignar',
+            prima_mensual: p.prima_mensual
+        };
+    });
 }
 
 /**
@@ -336,46 +337,27 @@ async function getClientesConVariosVehiculos() {
 
 /**
  * Q12: Agentes y cantidad de siniestros asociados
- * Base: Redis (con fallback a Neo4j)
+ * Base: Redis (con fallback a Neo4j y sincronización)
  */
 async function getAgentesConCantidadSiniestros() {
-    // Try Redis first
-    const counts = await redisClient.hGetAll('counts:agente:siniestros');
-
-    if (Object.keys(counts).length > 0) {
-        return Object.entries(counts).map(([id_agente, count]) => ({
-            id_agente,
-            cantidad_siniestros: parseInt(count, 10)
-        }));
-    }
-
-    // Cache miss - calculate from Neo4j
-    const session = getNeo4jSession();
     try {
-        const result = await session.run(`
-            MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
-            RETURN a.id_agente AS id_agente, a.nombre AS nombre, count(s) AS total
-            ORDER BY total DESC, a.nombre
-        `);
+        // Asegurarnos que el caché esté "caliente"
+        await ensureCacheIsWarm(Q12_HASH_KEY, Q12_LOCK_KEY, Q12_NEO4J_QUERY);
 
-        const data = result.records.map(record => ({
-            id_agente: record.get('id_agente'),
-            nombre: record.get('nombre'),
-            cantidad_siniestros: record.get('total').toNumber()
-        }));
+        // Leer del caché caliente
+        const counts = await redisClient.hGetAll(Q12_HASH_KEY);
 
-        // Populate Redis
-        if (data.length > 0) {
-            const multi = redisClient.multi();
-            for (const item of data) {
-                multi.hSet('counts:agente:siniestros', item.id_agente, item.cantidad_siniestros);
-            }
-            await multi.exec();
-        }
+        // Convertir la respuesta de Redis en el formato esperado
+        return Object.entries(counts)
+            .filter(([key, _]) => key !== '_placeholder')
+            .map(([id_agente, count]) => ({
+                id_agente,
+                cantidad_siniestros: parseInt(count, 10)
+            }));
 
-        return data;
-    } finally {
-        await session.close();
+    } catch (error) {
+        console.error('Error en getAgentesConCantidadSiniestros:', error.message);
+        throw new Error('Could not retrieve agent siniestro counts');
     }
 }
 
@@ -391,5 +373,7 @@ module.exports = {
     getPolizasActivasOrdenadas,
     getPolizasSuspendidasConCliente,
     getClientesConVariosVehiculos,
-    getAgentesConCantidadSiniestros
+    getAgentesConCantidadSiniestros,
+    Q7_CACHE_KEY,
+    Q7_LOCK_KEY
 };

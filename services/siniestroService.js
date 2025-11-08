@@ -3,6 +3,14 @@ const Poliza = require('../models/Poliza');
 const Cliente = require('../models/Cliente');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
+const { ensureCacheIsWarm } = require('./cacheSync');
+
+const Q12_HASH_KEY = 'counts:agente:siniestros';
+const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
+const Q12_NEO4J_QUERY = `
+    MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
+    RETURN a.id_agente AS id, count(s) AS total
+`;
 
 /**
  * Q14: Alta de nuevos siniestros
@@ -78,23 +86,28 @@ async function createSiniestro(siniestroData) {
             monto_estimado: siniestro.monto_estimado
         });
 
-        // 4. Redis (Incremento CONDICIONAL):
-        // ONLY increment if the key already exists
+        // 4. Redis (Incremento Q12):
         try {
-            // Check if the hash field exists
-            const existingValue = await redisClient.hGet('counts:agente:siniestros', agenteId);
+            // PASO 4.A: Asegurarnos que el caché esté "caliente".
+            // Esta función chequeará si Q12_HASH_KEY existe.
+            // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
+            // Retorna { wasWarm: true/false } para saber si debemos incrementar.
+            const { wasWarm } = await ensureCacheIsWarm(Q12_HASH_KEY, Q12_LOCK_KEY, Q12_NEO4J_QUERY);
 
-            if (existingValue !== null) {
-                // Key exists, safe to increment
-                await redisClient.hIncrBy('counts:agente:siniestros', agenteId, 1);
+            // PASO 4.B: Solo incrementamos si el caché YA existía.
+            // Si wasWarm === false, significa que YO lo repoblé,
+            // y Neo4j ya incluyó este siniestro en el conteo → no incrementar.
+            if (wasWarm) {
+                await redisClient.hIncrBy(Q12_HASH_KEY, agenteId, 1);
                 console.log(`Redis: Incremented siniestro count for agente ${agenteId}`);
             } else {
-                // Key doesn't exist, DO NOT increment
-                console.log(`Redis: Skipped increment for agente ${agenteId} (key doesn't exist)`);
+                console.log(`Redis: Cache was just populated, no increment needed for agente ${agenteId}`);
             }
+
         } catch (redisError) {
-            // Redis error shouldn't fail the entire operation
-            console.error('Redis error (non-fatal):', redisError.message);
+            // Si ensureCacheIsWarm falla (ej. por timeout del lock),
+            // o HINCRBY falla, lo capturamos pero no detenemos la operación.
+            console.error('Redis error (non-fatal) during Q12 sync:', redisError.message);
         }
 
         return siniestro;
