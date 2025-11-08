@@ -20,6 +20,8 @@ const Q12_NEO4J_QUERY = `
     RETURN a.id_agente AS id, count(s) AS total
 `;
 
+const Q7_CACHE_KEY = 'ranking:top10_clientes';
+const Q7_LOCK_KEY = 'lock:cache:top10_clientes';
 
 /**
  * Q1: Clientes activos con sus pólizas vigentes (array embebido)
@@ -219,19 +221,41 @@ async function getPolizasVencidas() {
 /**
  * Q7: Top 10 clientes por cobertura total
  * Base: Redis (con fallback a Neo4j)
+ * Usa lock para evitar race condition de stale write durante invalidación
  */
-//TODO: ver si ponemos locks o lo hacemos de una en neo
 async function getTop10ClientesPorCobertura() {
-    // Try Redis first
-    const cached = await redisClient.get('ranking:top10_clientes');
-
+    const cached = await redisClient.get(Q7_CACHE_KEY);
     if (cached) {
         return JSON.parse(cached);
     }
 
-    // Cache miss - calculate from Neo4j
+    let lockAcquired = false;
+    while (!lockAcquired) {
+        lockAcquired = await redisClient.set(Q7_LOCK_KEY, 'true', {
+            NX: true,
+            EX: 40
+        });
+
+        if (!lockAcquired) {
+            // Esperar y verificar si otro thread pobló el cache
+            await new Promise(resolve => setTimeout(resolve, 200));
+            const nowCached = await redisClient.get(Q7_CACHE_KEY);
+            if (nowCached) {
+                console.log('(Q7) Otro thread pobló el cache.');
+                return JSON.parse(nowCached);
+            }
+        }
+    }
+
+    console.log('(Q7) Lock adquirido. Calculando desde Neo4j...');
     const session = getNeo4jSession();
     try {
+        const nowCached = await redisClient.get(Q7_CACHE_KEY);
+        if (nowCached) {
+            console.log('(Q7) Cache encontrado después de lock.');
+            return JSON.parse(nowCached);
+        }
+
         const result = await session.run(`
             MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
             WHERE p.estado = 'activa'
@@ -245,12 +269,14 @@ async function getTop10ClientesPorCobertura() {
             total_cobertura: record.get('total_cobertura')
         }));
 
-        // Store in Redis
-        await redisClient.set('ranking:top10_clientes', JSON.stringify(data));
+        await redisClient.set(Q7_CACHE_KEY, JSON.stringify(data));
+        console.log('(Q7) Cache poblado en Redis.');
 
         return data;
     } finally {
         await session.close();
+        await redisClient.del(Q7_LOCK_KEY);
+        console.log('(Q7) Lock liberado.');
     }
 }
 
@@ -375,5 +401,7 @@ module.exports = {
     getPolizasActivasOrdenadas,
     getPolizasSuspendidasConCliente,
     getClientesConVariosVehiculos,
-    getAgentesConCantidadSiniestros
+    getAgentesConCantidadSiniestros,
+    Q7_CACHE_KEY,
+    Q7_LOCK_KEY
 };

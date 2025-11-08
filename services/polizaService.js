@@ -5,6 +5,7 @@ const Siniestro = require('../models/Siniestro');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
 const { ensureCacheIsWarm } = require('./cacheSync');
+const { Q7_CACHE_KEY, Q7_LOCK_KEY } = require('./queryService');
 
 const Q5_HASH_KEY = 'counts:agente:polizas';
 const Q5_LOCK_KEY = 'lock:cache:repopulating_q5';
@@ -159,8 +160,19 @@ async function createPoliza(polizaData) {
             console.log(`Updated old Auto policy ${oldAutoPolizaNro} to estado: ${oldAutoPolizaEstado}`);
         }
 
-        // 8. Redis (Invalidación Q7): Invalidate top10 ranking
-        await redisClient.del('ranking:top10_clientes');
+        let lockAcquired = false;
+        while (!lockAcquired) {
+            lockAcquired = await redisClient.set(Q7_LOCK_KEY, 'true', { NX: true, EX: 40 });
+            if (!lockAcquired) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        try {
+            await redisClient.del(Q7_CACHE_KEY);
+            console.log('Redis: Q7 cache invalidated');
+        } finally {
+            await redisClient.del(Q7_LOCK_KEY);
+        }
 
 
         // 9. Redis (Incremento Q5):
@@ -241,7 +253,19 @@ async function updatePolizaEstado(nro_poliza, nuevoEstado) {
             SET p.estado = toLower($estado)
         `, { nro_poliza, estado: nuevoEstado });
 
-        await redisClient.del('ranking:top10_clientes');
+        let lockAcquired = false;
+        while (!lockAcquired) {
+            lockAcquired = await redisClient.set(Q7_LOCK_KEY, 'true', { NX: true, EX: 40 });
+            if (!lockAcquired) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        try {
+            await redisClient.del(Q7_CACHE_KEY);
+            console.log('Redis: Q7 cache invalidated');
+        } finally {
+            await redisClient.del(Q7_LOCK_KEY);
+        }
 
         return poliza;
     } catch (error) {
