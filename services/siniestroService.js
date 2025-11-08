@@ -23,7 +23,7 @@ async function createSiniestro(siniestroData) {
     const session = getNeo4jSession();
     try {
         // 1. MongoDB (Lectura): Get the Poliza to obtain cliente_id and agente data
-        const poliza = await Poliza.findOne({ nro_poliza: siniestroData.nro_poliza }).lean();
+        const poliza = await Poliza.findOne({ _id: siniestroData.nro_poliza }).lean();
         if (!poliza) {
             throw new Error(`Poliza ${siniestroData.nro_poliza} not found`);
         }
@@ -32,19 +32,18 @@ async function createSiniestro(siniestroData) {
 
         // 2. MongoDB (Escritura): Create the siniestro with poliza_snapshot
         const siniestro = new Siniestro({
-            id_siniestro: siniestroData.id_siniestro,
             fecha: siniestroData.fecha || new Date(),
             tipo: siniestroData.tipo,
             monto_estimado: siniestroData.monto_estimado,
             descripcion: siniestroData.descripcion,
             estado: siniestroData.estado || 'Abierto',
             poliza_snapshot: {
-                nro_poliza: poliza.nro_poliza,
+                nro_poliza: siniestroData.nro_poliza,
                 tipo_cobertura: poliza.tipo,
                 fecha_vigencia_inicio: poliza.fecha_inicio,
                 fecha_vigencia_fin: poliza.fecha_fin,
                 cliente: {
-                    id_cliente: poliza.cliente_id,
+                    id_cliente: poliza.id_cliente,
                     nombre: 'Cliente', // We would need to fetch from Cliente collection
                     contacto: 'email@example.com'
                 },
@@ -70,13 +69,15 @@ async function createSiniestro(siniestroData) {
             })
             CREATE (p)-[:CUBRE_SINIESTRO]->(s)
         `, {
-            nro_poliza: poliza.nro_poliza,
+            nro_poliza: siniestroData.nro_poliza,
             id_siniestro: siniestro.id_siniestro,
             tipo: siniestro.tipo,
             fecha: siniestro.fecha.toISOString(),
             estado: siniestro.estado,
             monto_estimado: siniestro.monto_estimado
         });
+
+        console.log("HERE 4");
 
         // 4. Redis (Incremento Q12):
         try {

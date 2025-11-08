@@ -57,7 +57,6 @@ function extractNumericSuffix(str) {
 
 const parseCliente = (c) => ({
     _id: toIntId(c.id_cliente, 'cliente._id'),           // numeric _id
-    id_cliente: undefined,                                // drop original string prop
     nombre: c.nombre,
     apellido: c.apellido,
     dni: c.dni,
@@ -71,7 +70,6 @@ const parseCliente = (c) => ({
 
 const parseAgente = (a) => ({
     _id: toIntId(a.id_agente, 'agente._id'),              // numeric _id
-    id_agente: undefined,
     nombre: a.nombre,
     apellido: a.apellido,
     matricula: a.matricula,
@@ -83,7 +81,6 @@ const parseAgente = (a) => ({
 
 const parseVehiculo = (v) => ({
     _id: toIntId(v.id_vehiculo, 'vehiculo._id'),          // numeric _id (if your CSV has it)
-    id_vehiculo: undefined,
     id_cliente: toIntId(v.id_cliente, 'vehiculo.id_cliente'),
     marca: v.marca,
     modelo: v.modelo,
@@ -96,7 +93,6 @@ const parseVehiculo = (v) => ({
 const parsePoliza = (p) => ({
     // keep natural string id as _id for the collection (avoids inventing ids)
     _id: p.nro_poliza,                                    // string _id = nro_poliza
-    nro_poliza: p.nro_poliza,
     id_cliente: toIntId(p.id_cliente, 'poliza.id_cliente'),
     id_agente: p.id_agente && String(p.id_agente).trim() !== '' ? toIntId(p.id_agente, 'poliza.id_agente') : null,
     estado: p.estado ? String(p.estado).toLowerCase() : null,
@@ -108,13 +104,13 @@ const parsePoliza = (p) => ({
 });
 
 const parseSiniestro = (s) => ({
-    _id: toIntId(s.id_siniestro, 'siniestro._id'),        // numeric _id
-    id_siniestro: undefined,
-    nro_poliza: s.nro_poliza,                             // string ref to poliza
+    _id: toIntId(s.id_siniestro, 'siniestro._id'),
+    nro_poliza: s.nro_poliza,
     tipo: s.tipo,
     fecha: parseDateDDMMYYYY(s.fecha),
     estado: s.estado,
-    monto_estimado: Number(s.monto_estimado)
+    monto_estimado: Number(s.monto_estimado),
+    descripcion: s.descripcion ?? null              // <-- add this
 });
 
 /* ---------- main ---------- */
@@ -180,8 +176,23 @@ async function main() {
             return true;
         });
 
+        const polizasForMongo = polizasRaw.map(p => {
+            const ag = (p.id_agente != null) ? agenteById.get(p.id_agente) : null;
+            return {
+                ...p,
+                // mantenemos id_agente plano (sirve para Neo4j/Redis/joins),
+                // y además embebemos el snapshot como pide tu schema
+                agente: ag ? {
+                    id_agente: ag._id,
+                    nombre: ag.nombre,
+                    apellido: ag.apellido,
+                    matricula: ag.matricula
+                } : null
+            };
+        });
+
         // index polizas by nro_poliza
-        const polizaById = new Map(polizasRaw.map(p => [p._id, p]));
+        const polizaById = new Map(polizasForMongo.map(p => [p._id, p]));
 
         // Vehículos: numeric id_vehiculo (if present), numeric id_cliente
         const vehiculos = vehiculosCSV.map(parseVehiculo).filter(v => {
@@ -209,52 +220,62 @@ async function main() {
         }, new Map());
 
         // group polizas by cliente (already validated)
-        const polizasByCliente = polizasRaw.reduce((acc, p) => {
+        const polizasByCliente = polizasForMongo.reduce((acc, p) => {
             if (!acc.has(p.id_cliente)) acc.set(p.id_cliente, []);
             acc.get(p.id_cliente).push(p);
             return acc;
         }, new Map());
 
         // Siniestros: numeric id, link to poliza, build snapshot
-        const siniestros = siniestrosCSV.map(parseSiniestro).filter(s => {
-            if (s._id == null) { console.warn(`⚠️  Siniestro sin id válido, omitido`); return false; }
-            if (!s.nro_poliza || !polizaById.has(s.nro_poliza)) {
-                console.warn(`⚠️  Siniestro ${s._id} omitido: póliza ${s.nro_poliza} no existe`);
-                return false;
-            }
-            return true;
-        }).map(s => {
-            const pol = polizaById.get(s.nro_poliza);
-            const cli = clienteById.get(pol.id_cliente);
-            const ag = pol.id_agente != null ? agenteById.get(pol.id_agente) : null;
-
-            return {
-                ...s,
-                poliza_snapshot: {
-                    nro_poliza: pol.nro_poliza,
-                    tipo_cobertura: pol.tipo,
-                    fecha_vigencia_inicio: pol.fecha_inicio,
-                    fecha_vigencia_fin: pol.fecha_fin,
-                    cliente: {
-                        id_cliente: cli?._id,
-                        nombre: `${cli?.nombre ?? ''} ${cli?.apellido ?? ''}`.trim(),
-                        contacto: cli?.email ?? null
-                    },
-                    agente: ag ? {
-                        id_agente: ag._id,
-                        nombre: `${ag.nombre ?? ''} ${ag.apellido ?? ''}`.trim(),
-                        matricula: ag.matricula ?? null
-                    } : null
+        const siniestros = siniestrosCSV
+            .map(parseSiniestro)
+            .filter(s => {
+                if (s._id == null) { console.warn(`⚠️  Siniestro sin id válido, omitido`); return false; }
+                if (!s.nro_poliza || !polizaById.has(s.nro_poliza)) {
+                    console.warn(`⚠️  Siniestro ${s._id} omitido: póliza ${s.nro_poliza} no existe`);
+                    return false;
                 }
-            };
-        });
+                return true;
+            })
+            .map(s => {
+                const {nro_poliza, ...rest} = s;
+                const pol = polizaById.get(nro_poliza);      // <-- from polizasForMongo (with agente embebido)
+                const cli = clienteById.get(pol.id_cliente);
+                // agente embebido ya viene en `pol.agente` (o null)
+                const ag = pol.agente
+                    ? {
+                        id_agente: pol.agente.id_agente,
+                        nombre: `${pol.agente.nombre ?? ''} ${pol.agente.apellido ?? ''}`.trim(),
+                        matricula: pol.agente.matricula ?? null
+                    }
+                    : null;
+
+                return {
+                    ...rest,
+                    poliza_snapshot: {
+                        nro_poliza: pol._id,                         // mismo que pol.nro_poliza
+                        tipo_cobertura: pol.tipo,
+                        fecha_vigencia_inicio: pol.fecha_inicio,
+                        fecha_vigencia_fin: pol.fecha_fin,
+                        cliente: {
+                            id_cliente: cli?._id,
+                            nombre: `${cli?.nombre ?? ''} ${cli?.apellido ?? ''}`.trim(),
+                            contacto: cli?.email ?? null
+                        },
+                        agente: ag
+                    }
+                };
+            });
 
         /* ---------- Mongo inserts ---------- */
 
         console.log('🧩 Insertando en MongoDB...');
 
         if (agentes.length) await db.collection('agentes').insertMany(agentes, { ordered: true });
-        if (polizasRaw.length) await db.collection('polizas').insertMany(polizasRaw, { ordered: true });
+
+        if (polizasForMongo.length) {
+            await db.collection('polizas').insertMany(polizasForMongo, { ordered: true });
+        }
         if (siniestros.length) await db.collection('siniestros').insertMany(siniestros, { ordered: true });
 
         // Enriquecer clientes con vehículos y poliza_auto_vigente (tipo=auto & estado activo)
@@ -303,7 +324,7 @@ async function main() {
 
         // Optional counter for polizas (based on numeric suffix), if you ever want to auto-issue new POLnnnn
         const polNumSuffixes = polizasRaw
-            .map(p => extractNumericSuffix(p.nro_poliza))
+            .map(p => extractNumericSuffix(p._id))
             .filter(n => Number.isFinite(n));
         const maxPolNum = maxOrZero(polNumSuffixes);
 
