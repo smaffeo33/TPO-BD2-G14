@@ -6,19 +6,19 @@ const PolizaSnapshotSchema = new mongoose.Schema({
     fecha_vigencia_inicio: Date,
     fecha_vigencia_fin: Date,
     cliente: {
-        id_cliente: String,
+        id_cliente: Number,
         nombre: String,
         contacto: String
     },
     agente: {
-        id_agente: String,
+        id_agente: Number,
         nombre: String,
         matricula: String
     }
 }, { _id: false });
 
 const SiniestroSchema = new mongoose.Schema({
-    id_siniestro: { type: String, required: true, unique: true, index: true },
+    id_siniestro: { type: Number, required: true, unique: true, index: true },
     fecha: Date,
     tipo: String,
     monto_estimado: Number,

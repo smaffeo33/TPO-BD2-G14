@@ -44,7 +44,7 @@ async function createPoliza(polizaData) {
         }
 
         // 2. MongoDB (Lectura): Get Agente data to embed
-        const agente = await Agente.findOne({ id_agente: polizaData.id_agente }).lean();
+        const agente = await Agente.findOne({ _id: polizaData.id_agente }).lean();
         if (!agente) {
             throw new Error('Agente not found in MongoDB');
         }
@@ -64,10 +64,11 @@ async function createPoliza(polizaData) {
             }
         }
 
+
+
         // 4. MongoDB (Escritura): Create the new Poliza
         const poliza = new Poliza({
-            nro_poliza: polizaData.nro_poliza,
-            cliente_id: polizaData.id_cliente,
+            id_cliente: polizaData.id_cliente,
             tipo: polizaData.tipo,
             fecha_inicio: polizaData.fecha_inicio,
             fecha_fin: polizaData.fecha_fin,
@@ -75,7 +76,7 @@ async function createPoliza(polizaData) {
             cobertura_total: polizaData.cobertura_total,
             estado: polizaData.estado || 'Vigente',
             agente: {
-                id_agente: agente.id_agente,
+                id_agente: agente._id,
                 nombre: agente.nombre,
                 apellido: agente.apellido,
                 matricula: agente.matricula
