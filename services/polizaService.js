@@ -62,7 +62,7 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
     // 1. Ver si el caché existe
     const cacheExists = await redisClient.exists(hashKey);
     if (cacheExists) {
-        return true; // El caché existe, podemos continuar
+        return { wasWarm: true }; // El caché ya existía
     }
 
     // 2. El caché no existe.
@@ -83,7 +83,7 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
             const cacheNowExists = await redisClient.exists(hashKey);
             if (cacheNowExists) {
                 console.log(`(ensureCacheIsWarm) El caché fue poblado por otro hilo mientras esperábamos. Continuando.`);
-                return true;
+                return { wasWarm: true }; // Otro thread lo pobló
             }
         }
     }
@@ -102,7 +102,7 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
         await redisClient.del(lockKey);
         console.log(`(ensureCacheIsWarm) Lock liberado.`);
     }
-    return true;
+    return { wasWarm: false }; // YO lo repoblé
 }
 
 
@@ -262,16 +262,18 @@ async function createPoliza(polizaData) {
             // PASO 9.A: Asegurarnos que el caché esté "caliente".
             // Esta función (definida arriba) chequeará si Q5_HASH_KEY existe.
             // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
-            // Si el lock está ocupado, esperará.
-            await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
+            // Retorna { wasWarm: true/false } para saber si debemos incrementar.
+            const { wasWarm } = await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
 
-            // PASO 9.B: Ahora que estamos 100% seguros que el caché existe
-            // y está poblado, podemos ejecutar HINCRBY de forma segura.
-            // Ya no necesitamos el "if (existingValue !== null)".
-            await redisClient.hIncrBy(Q5_HASH_KEY, polizaData.id_agente, 1);
-            // TODO: Esto de arriba esta mal, si la acabo de cargar yo estoy incrementando algo que ya esta actualizado
-
-            console.log(`Redis: Incremented poliza count for agente ${polizaData.id_agente}`);
+            // PASO 9.B: Solo incrementamos si el caché YA existía.
+            // Si wasWarm === false, significa que YO lo repoblé,
+            // y Neo4j ya incluyó esta póliza en el conteo → no incrementar.
+            if (wasWarm) {
+                await redisClient.hIncrBy(Q5_HASH_KEY, polizaData.id_agente, 1);
+                console.log(`Redis: Incremented poliza count for agente ${polizaData.id_agente}`);
+            } else {
+                console.log(`Redis: Cache was just populated, no increment needed for agente ${polizaData.id_agente}`);
+            }
 
         } catch (redisError) {
             // Si ensureCacheIsWarm falla (ej. por timeout del lock),

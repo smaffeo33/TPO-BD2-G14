@@ -235,7 +235,7 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
     // 1. Ver si el caché existe
     const cacheExists = await redisClient.exists(hashKey);
     if (cacheExists) {
-        return true; // El caché existe, podemos continuar
+        return { wasWarm: true }; // El caché ya existía
     }
 
     // 2. El caché no existe.
@@ -256,7 +256,7 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
             const cacheNowExists = await redisClient.exists(hashKey);
             if (cacheNowExists) {
                 console.log(`(ensureCacheIsWarm) El caché fue poblado por otro hilo mientras esperábamos. Continuando.`);
-                return true;
+                return { wasWarm: true }; // Otro thread lo pobló
             }
         }
     }
@@ -275,7 +275,7 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
         await redisClient.del(lockKey);
         console.log(`(ensureCacheIsWarm) Lock liberado.`);
     }
-    return true;
+    return { wasWarm: false }; // YO lo repoblé
 }
 
 
