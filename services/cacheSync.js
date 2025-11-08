@@ -92,7 +92,101 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
     return { wasWarm: false }; // YO lo repoblé
 }
 
+/**
+ * Invalidar una cache key con lock para prevenir race conditions.
+ * Útil cuando se necesita garantizar que una invalidación no sea sobrescrita
+ * por un thread que está calculando datos viejos.
+ *
+ * @param {string} cacheKey - La key del cache a invalidar
+ * @param {string} lockKey - La key del lock a usar
+ * @returns {Promise<void>}
+ */
+async function invalidateCacheWithLock(cacheKey, lockKey) {
+    console.log(`(invalidateCacheWithLock) Adquiriendo lock para invalidar ${cacheKey}...`);
+
+    let lockAcquired = false;
+    while (!lockAcquired) {
+        lockAcquired = await redisClient.set(lockKey, 'true', {
+            NX: true,
+            EX: LOCK_TTL
+        });
+
+        if (!lockAcquired) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+    }
+
+    try {
+        await redisClient.del(cacheKey);
+        console.log(`(invalidateCacheWithLock) Cache ${cacheKey} invalidado.`);
+    } finally {
+        await redisClient.del(lockKey);
+        console.log(`(invalidateCacheWithLock) Lock liberado.`);
+    }
+}
+
+/**
+ * Patrón genérico de compute-and-cache con lock.
+ * Previene race conditions entre cálculo y escritura del cache.
+ *
+ * @param {string} cacheKey - La key del cache a leer/escribir
+ * @param {string} lockKey - La key del lock a usar
+ * @param {Function} computeFn - Función async que calcula los datos (retorna el objeto a cachear)
+ * @returns {Promise<any>} Los datos calculados o cacheados
+ */
+async function computeAndCacheWithLock(cacheKey, lockKey, computeFn) {
+    // Fast path: leer cache sin lock
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // Cache miss - adquirir lock
+    console.log(`(computeAndCacheWithLock) Cache MISS en ${cacheKey}. Adquiriendo lock...`);
+    let lockAcquired = false;
+    while (!lockAcquired) {
+        lockAcquired = await redisClient.set(lockKey, 'true', {
+            NX: true,
+            EX: LOCK_TTL
+        });
+
+        if (!lockAcquired) {
+            // Esperar y verificar si otro thread pobló el cache
+            await new Promise(resolve => setTimeout(resolve, 200));
+            const nowCached = await redisClient.get(cacheKey);
+            if (nowCached) {
+                console.log(`(computeAndCacheWithLock) Otro thread pobló el cache.`);
+                return JSON.parse(nowCached);
+            }
+        }
+    }
+
+    console.log(`(computeAndCacheWithLock) Lock adquirido. Calculando...`);
+    try {
+        // Double-check después del lock
+        const nowCached = await redisClient.get(cacheKey);
+        if (nowCached) {
+            console.log(`(computeAndCacheWithLock) Cache encontrado después de lock.`);
+            return JSON.parse(nowCached);
+        }
+
+        // Calcular datos usando la función provista
+        const data = await computeFn();
+
+        // Escribir en Redis (aún tenemos el lock)
+        await redisClient.set(cacheKey, JSON.stringify(data));
+        console.log(`(computeAndCacheWithLock) Cache ${cacheKey} poblado.`);
+
+        return data;
+    } finally {
+        await redisClient.del(lockKey);
+        console.log(`(computeAndCacheWithLock) Lock liberado.`);
+    }
+}
+
 module.exports = {
     ensureCacheIsWarm,
+    invalidateCacheWithLock,
+    computeAndCacheWithLock,
     LOCK_TTL
 };

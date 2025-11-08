@@ -4,7 +4,7 @@ const Cliente = require('../models/Cliente');
 const Siniestro = require('../models/Siniestro');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
-const { ensureCacheIsWarm } = require('./cacheSync');
+const { ensureCacheIsWarm, invalidateCacheWithLock } = require('./cacheSync');
 const { Q7_CACHE_KEY, Q7_LOCK_KEY } = require('./queryService');
 
 const Q5_HASH_KEY = 'counts:agente:polizas';
@@ -160,20 +160,8 @@ async function createPoliza(polizaData) {
             console.log(`Updated old Auto policy ${oldAutoPolizaNro} to estado: ${oldAutoPolizaEstado}`);
         }
 
-        let lockAcquired = false;
-        while (!lockAcquired) {
-            lockAcquired = await redisClient.set(Q7_LOCK_KEY, 'true', { NX: true, EX: 40 });
-            if (!lockAcquired) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-        }
-        try {
-            await redisClient.del(Q7_CACHE_KEY);
-            console.log('Redis: Q7 cache invalidated');
-        } finally {
-            await redisClient.del(Q7_LOCK_KEY);
-        }
-
+        // 8. Redis (Invalidación Q7): Invalidate top10 ranking con lock
+        await invalidateCacheWithLock(Q7_CACHE_KEY, Q7_LOCK_KEY);
 
         // 9. Redis (Incremento Q5):
         try {
@@ -253,19 +241,8 @@ async function updatePolizaEstado(nro_poliza, nuevoEstado) {
             SET p.estado = toLower($estado)
         `, { nro_poliza, estado: nuevoEstado });
 
-        let lockAcquired = false;
-        while (!lockAcquired) {
-            lockAcquired = await redisClient.set(Q7_LOCK_KEY, 'true', { NX: true, EX: 40 });
-            if (!lockAcquired) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-        }
-        try {
-            await redisClient.del(Q7_CACHE_KEY);
-            console.log('Redis: Q7 cache invalidated');
-        } finally {
-            await redisClient.del(Q7_LOCK_KEY);
-        }
+        // Invalidar Q7 con lock
+        await invalidateCacheWithLock(Q7_CACHE_KEY, Q7_LOCK_KEY);
 
         return poliza;
     } catch (error) {

@@ -4,7 +4,7 @@ const Cliente = require('../models/Cliente');
 const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
 const Agente = require('../models/Agente');
-const { ensureCacheIsWarm } = require('./cacheSync');
+const { ensureCacheIsWarm, computeAndCacheWithLock } = require('./cacheSync');
 
 const Q5_HASH_KEY = 'counts:agente:polizas';
 const Q5_LOCK_KEY = 'lock:cache:repopulating_q5';
@@ -224,60 +224,25 @@ async function getPolizasVencidas() {
  * Usa lock para evitar race condition de stale write durante invalidación
  */
 async function getTop10ClientesPorCobertura() {
-    const cached = await redisClient.get(Q7_CACHE_KEY);
-    if (cached) {
-        return JSON.parse(cached);
-    }
+    return computeAndCacheWithLock(Q7_CACHE_KEY, Q7_LOCK_KEY, async () => {
+        const session = getNeo4jSession();
+        try {
+            const result = await session.run(`
+                MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
+                WHERE p.estado = 'activa'
+                RETURN c.nombre AS cliente_nombre, sum(p.cobertura_total) AS total_cobertura
+                ORDER BY total_cobertura DESC
+                LIMIT 10
+            `);
 
-    let lockAcquired = false;
-    while (!lockAcquired) {
-        lockAcquired = await redisClient.set(Q7_LOCK_KEY, 'true', {
-            NX: true,
-            EX: 40
-        });
-
-        if (!lockAcquired) {
-            // Esperar y verificar si otro thread pobló el cache
-            await new Promise(resolve => setTimeout(resolve, 200));
-            const nowCached = await redisClient.get(Q7_CACHE_KEY);
-            if (nowCached) {
-                console.log('(Q7) Otro thread pobló el cache.');
-                return JSON.parse(nowCached);
-            }
+            return result.records.map(record => ({
+                cliente_nombre: record.get('cliente_nombre'),
+                total_cobertura: record.get('total_cobertura')
+            }));
+        } finally {
+            await session.close();
         }
-    }
-
-    console.log('(Q7) Lock adquirido. Calculando desde Neo4j...');
-    const session = getNeo4jSession();
-    try {
-        const nowCached = await redisClient.get(Q7_CACHE_KEY);
-        if (nowCached) {
-            console.log('(Q7) Cache encontrado después de lock.');
-            return JSON.parse(nowCached);
-        }
-
-        const result = await session.run(`
-            MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
-            WHERE p.estado = 'activa'
-            RETURN c.nombre AS cliente_nombre, sum(p.cobertura_total) AS total_cobertura
-            ORDER BY total_cobertura DESC
-            LIMIT 10
-        `);
-
-        const data = result.records.map(record => ({
-            cliente_nombre: record.get('cliente_nombre'),
-            total_cobertura: record.get('total_cobertura')
-        }));
-
-        await redisClient.set(Q7_CACHE_KEY, JSON.stringify(data));
-        console.log('(Q7) Cache poblado en Redis.');
-
-        return data;
-    } finally {
-        await session.close();
-        await redisClient.del(Q7_LOCK_KEY);
-        console.log('(Q7) Lock liberado.');
-    }
+    });
 }
 
 /**
