@@ -1,3 +1,5 @@
+// services/siniestro.service.js
+
 const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
 const Cliente = require('../models/Cliente');
@@ -7,38 +9,33 @@ const { ensureCacheIsWarm } = require('./cacheSync');
 
 const Q12_HASH_KEY = 'counts:agente:siniestros';
 const Q12_LOCK_KEY = 'lock:cache:repopulating_q12';
+// CORRECCIÓN 1: Forzar el ID a String para que coincida con loadData.js
 const Q12_NEO4J_QUERY = `
-    MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
-    RETURN a.id_agente AS id, count(s) AS total
+    MATCH (a:Agente)-[:GESTIONA]->(p:Poliza)-[:CUBRE_SINISTRO]->(s:Siniestro)
+    RETURN toString(a.id_agente) AS id, count(s) AS total
 `;
 
-/**
- * Q14: Alta de nuevos siniestros
- *
- * IMPORTANT: Redis INCR should ONLY happen if the key already exists!
- * Always write to Neo4j regardless of Redis success.
- *
- * Affects: MongoDB (read + write), Neo4j (write), Redis (conditional increment)
- */
 async function createSiniestro(siniestroData) {
     const session = getNeo4jSession();
     try {
-        // 1. MongoDB (Lectura): Get the Poliza to obtain cliente_id and agente data
+        // 1. MongoDB (Lectura): Poliza._id es un STRING (nro_poliza), esto está OK.
         const poliza = await Poliza.findOne({ _id: siniestroData.nro_poliza }).lean();
         if (!poliza) {
             throw new Error(`Poliza ${siniestroData.nro_poliza} not found`);
         }
 
+        // agenteId será un NÚMERO (del snapshot de poliza)
         const agenteId = poliza.agente.id_agente;
+        // id_cliente será un NÚMERO (de la poliza)
+        const clienteId = poliza.id_cliente;
 
-        // 1b. MongoDB (Lectura): Obtener Cliente usando el ID de la póliza
-        // (Asegúrate de tener importado tu modelo 'Cliente')
-        const cliente = await Cliente.findOne({ _id: poliza.id_cliente }).lean();
+        // 1b. MongoDB (Lectura): Cliente.findOne por _id numérico. Esto está OK.
+        const cliente = await Cliente.findOne({ _id: clienteId }).lean();
         if (!cliente) {
-            throw new Error(`Cliente ${poliza.id_cliente} asociado a la póliza no fue encontrado.`);
+            throw new Error(`Cliente ${clienteId} asociado a la póliza no fue encontrado.`);
         }
 
-        // 2. MongoDB (Escritura): Create the siniestro with poliza_snapshot
+        // 2. MongoDB (Escritura): Siniestro.save() auto-generará el _id numérico
         const siniestro = new Siniestro({
             fecha: siniestroData.fecha || new Date(),
             tipo: siniestroData.tipo,
@@ -51,21 +48,20 @@ async function createSiniestro(siniestroData) {
                 fecha_vigencia_inicio: poliza.fecha_inicio,
                 fecha_vigencia_fin: poliza.fecha_fin,
                 cliente: {
-                    id_cliente: poliza.id_cliente,
+                    id_cliente: clienteId,
                     nombre: `${cliente.nombre} ${cliente.apellido}`,
                     contacto: cliente.email
                 },
                 agente: {
-                    id_agente: poliza.agente.id_agente,
+                    id_agente: agenteId,
                     nombre: `${poliza.agente.nombre} ${poliza.agente.apellido}`,
                     matricula: poliza.agente.matricula
                 }
             }
         });
-        await siniestro.save();
+        await siniestro.save(); // El hook pre-validate llena siniestro._id (numérico)
 
-        // 3. Neo4j (Escritura): Create Siniestro node and relationship
-        // ALWAYS write to Neo4j regardless of Redis status
+        // 3. Neo4j (Escritura):
         await session.run(`
             MATCH (p:Poliza {nro_poliza: $nro_poliza})
             CREATE (s:Siniestro {
@@ -75,10 +71,10 @@ async function createSiniestro(siniestroData) {
                 estado: $estado,
                 monto_estimado: $monto_estimado
             })
-            CREATE (p)-[:CUBRE_SINIESTRO]->(s)
+            CREATE (p)-[:CUBRE_SINISTRO]->(s)
         `, {
             nro_poliza: siniestroData.nro_poliza,
-            id_siniestro: siniestro.id_siniestro,
+            id_siniestro: siniestro._id, // <-- CORRECCIÓN 2: Usar el _id real (numérico)
             tipo: siniestro.tipo,
             fecha: siniestro.fecha.toISOString(),
             estado: siniestro.estado,
@@ -87,25 +83,17 @@ async function createSiniestro(siniestroData) {
 
         // 4. Redis (Incremento Q12):
         try {
-            // PASO 4.A: Asegurarnos que el caché esté "caliente".
-            // Esta función chequeará si Q12_HASH_KEY existe.
-            // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
-            // Retorna { wasWarm: true/false } para saber si debemos incrementar.
             const { wasWarm } = await ensureCacheIsWarm(Q12_HASH_KEY, Q12_LOCK_KEY, Q12_NEO4J_QUERY);
 
-            // PASO 4.B: Solo incrementamos si el caché YA existía.
-            // Si wasWarm === false, significa que YO lo repoblé,
-            // y Neo4j ya incluyó este siniestro en el conteo → no incrementar.
             if (wasWarm) {
-                await redisClient.hIncrBy(Q12_HASH_KEY, agenteId, 1);
+                // CORRECCIÓN 3: Usar String(agenteId) para el HASH
+                await redisClient.hIncrBy(Q12_HASH_KEY, String(agenteId), 1);
                 console.log(`Redis: Incremented siniestro count for agente ${agenteId}`);
             } else {
                 console.log(`Redis: Cache was just populated, no increment needed for agente ${agenteId}`);
             }
 
         } catch (redisError) {
-            // Si ensureCacheIsWarm falla (ej. por timeout del lock),
-            // o HINCRBY falla, lo capturamos pero no detenemos la operación.
             console.error('Redis error (non-fatal) during Q12 sync:', redisError.message);
         }
 
@@ -117,33 +105,33 @@ async function createSiniestro(siniestroData) {
     }
 }
 
-/**
- * Get siniestro by id
- */
 async function getSiniestroById(id_siniestro) {
-    const siniestro = await Siniestro.findOne({ id_siniestro }).lean();
+    // CORRECCIÓN 4: Convertir el ID de string (de la URL) a número
+    const numericId = Number(id_siniestro);
+    if (isNaN(numericId)) throw new Error('Invalid ID format');
+
+    // Buscar por el _id numérico
+    const siniestro = await Siniestro.findOne({ _id: numericId }).lean();
     if (!siniestro) {
         throw new Error('Siniestro not found');
     }
     return siniestro;
 }
 
-/**
- * Get all siniestros
- */
 async function getAllSiniestros() {
     return await Siniestro.find().sort({ fecha: -1 }).lean();
 }
 
-/**
- * Update siniestro estado
- */
 async function updateSiniestroEstado(id_siniestro, nuevoEstado) {
     const session = getNeo4jSession();
     try {
-        // Update in MongoDB
+        // CORRECCIÓN 5: Convertir el ID de string (de la URL) a número
+        const numericId = Number(id_siniestro);
+        if (isNaN(numericId)) throw new Error('Invalid ID format');
+
+        // Update in MongoDB (usando _id numérico)
         const siniestro = await Siniestro.findOneAndUpdate(
-            { id_siniestro },
+            { _id: numericId }, // <-- CORREGIDO
             { $set: { estado: nuevoEstado } },
             { new: true }
         );
@@ -152,11 +140,11 @@ async function updateSiniestroEstado(id_siniestro, nuevoEstado) {
             throw new Error('Siniestro not found');
         }
 
-        // Update in Neo4j
+        // Update in Neo4j (usando id_siniestro numérico)
         await session.run(`
             MATCH (s:Siniestro {id_siniestro: $id_siniestro})
             SET s.estado = $estado
-        `, { id_siniestro, estado: nuevoEstado });
+        `, { id_siniestro: numericId, estado: nuevoEstado }); // <-- CORREGIDO
 
         return siniestro;
     } catch (error) {

@@ -2,7 +2,8 @@ const Cliente = require('../models/Cliente');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
 const {mongoose} = require("../config/db.mongo");
-
+// La corrección:
+const polizaService = require("./polizaService");
 
 
 /**
@@ -64,9 +65,11 @@ async function createCliente(clienteData) {
 async function updateCliente(id_cliente, updates) {
     const session = getNeo4jSession();
     try {
+        const numericId = Number(id_cliente);
+        if (isNaN(numericId)) throw new Error('Invalid ID format');
         // 1. MongoDB: Update cliente
         const cliente = await Cliente.findOneAndUpdate(
-            { id_cliente },
+            { _id: numericId },
             { $set: updates },
             { new: true }
         );
@@ -78,7 +81,7 @@ async function updateCliente(id_cliente, updates) {
         // 2. Neo4j: Update node properties
         const neo4jUpdates = {};
         if (updates.nombre || updates.apellido) {
-            const currentCliente = await Cliente.findOne({ id_cliente }).lean();
+            const currentCliente = await Cliente.findOne({ _id:numericId }).lean();
             neo4jUpdates.nombre = `${updates.nombre || currentCliente.nombre} ${updates.apellido || currentCliente.apellido}`;
         }
         if (updates.activo !== undefined) {
@@ -90,7 +93,7 @@ async function updateCliente(id_cliente, updates) {
                 MATCH (c:Cliente {id_cliente: $id_cliente})
                 SET c += $updates
             `, {
-                id_cliente,
+                id_cliente: numericId,
                 updates: neo4jUpdates
             });
         }
@@ -110,39 +113,52 @@ async function updateCliente(id_cliente, updates) {
  * Delete a cliente
  * Affects: MongoDB, Neo4j, Redis (invalidation)
  */
+// services/cliente.service.js
+
 async function deleteCliente(id_cliente) {
     const session = getNeo4jSession();
     try {
-        // 1. Check if cliente has active policies
-        const result = await session.run(`
-            MATCH (c:Cliente {id_cliente: $id_cliente})-[:TIENE_POLIZA]->(p:Poliza)
-            WHERE p.estado = 'vigente' OR p.estado = 'activa'
-            RETURN count(p) AS count
-        `, { id_cliente });
+        const numericId = Number(id_cliente);
+        if (isNaN(numericId)) throw new Error('Invalid ID format');
+        // -------------------------
 
-        const activePolizasCount = result.records[0].get('count').toNumber();
-        if (activePolizasCount > 0) {
-            throw new Error('Cannot delete cliente with active policies');
+
+        // 1. Buscar y suspender pólizas activas (¡Esta lógica está perfecta!)
+        const polizasActivas = await polizaService.getActivePolizasByCliente(numericId);
+        if (polizasActivas && polizasActivas.length > 0) {
+            await Promise.all(
+                polizasActivas.map(poliza => // <-- 'poliza' es un objeto
+                    polizaService.updatePolizaEstado(poliza._id, 'Suspendida') // <-- ¡ARREGLADO!
+                )
+            );
         }
 
-        // 2. MongoDB: Delete cliente
-        const cliente = await Cliente.findOneAndDelete({ id_cliente });
+        // 2. MongoDB: NO BORRAR, "desactivar"
+        const cliente = await Cliente.findOneAndUpdate(
+            { _id: numericId},
+            { $set: { activo: false } },
+            { new: true }
+        );
+
         if (!cliente) {
             throw new Error('Cliente not found');
         }
 
-        // 3. Neo4j: Delete node and all relationships
+        // 3. Neo4j: NO BORRAR, "desactivar"
         await session.run(`
             MATCH (c:Cliente {id_cliente: $id_cliente})
-            DETACH DELETE c
-        `, { id_cliente });
+            SET c.activo = false  
+        `, { id_cliente : numericId });
 
-        // 4. Redis: Invalidate ranking
+        // 4. Redis: Invalidar caché
         await redisClient.del('ranking:top10_clientes');
 
-        return { success: true, message: 'Cliente deleted successfully' };
+        return {
+            success: true,
+            message: `Cliente ${id_cliente} marcado como INACTIVO.`
+        };
     } catch (error) {
-        throw new Error(`Error deleting cliente: ${error.message}`);
+        throw new Error(`Error deactivating cliente: ${error.message}`);
     } finally {
         await session.close();
     }
