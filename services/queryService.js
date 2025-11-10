@@ -178,9 +178,17 @@ async function getAgentesConCantidadPolizas() {
         // está centralizada en 'ensureCacheIsWarm'.
         const counts = await redisClient.hGetAll(Q5_HASH_KEY);
 
+        // Reforzamos el filtro de agentes activos usando Mongo por si alguien
+        // desactiva un agente después de poblar el cache.
+        const agentesActivos = await Agente.find({ activo: true })
+            .select('_id')
+            .lean();
+        const agentesActivosSet = new Set(agentesActivos.map(a => String(a._id)));
+
         // Convertir la respuesta de Redis en el formato de array esperado
         return Object.entries(counts)
             .filter(([key, _]) => key !== '_placeholder') // Filtrar el placeholder si existe
+            .filter(([id_agente]) => agentesActivosSet.has(id_agente))
             .map(([id_agente, count]) => ({
                 id_agente,
                 cantidad_polizas: parseInt(count, 10)
@@ -229,16 +237,23 @@ async function getTop10ClientesPorCobertura() {
         try {
             const result = await session.run(`
                 MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)
-                WHERE p.estado = 'activa'
-                RETURN c.nombre AS cliente_nombre, sum(p.cobertura_total) AS total_cobertura
-                ORDER BY total_cobertura DESC
+                WHERE toLower(p.estado) = 'activa'
+                RETURN c.nombre AS cliente_nombre,
+                       c.apellido AS cliente_apellido,
+                       sum(p.cobertura_total) AS total_cobertura,
+                       c.id_cliente AS id_cliente
+                ORDER BY total_cobertura DESC, id_cliente ASC
                 LIMIT 10
             `);
 
-            return result.records.map(record => ({
-                cliente_nombre: record.get('cliente_nombre'),
-                total_cobertura: record.get('total_cobertura')
-            }));
+            return result.records.map(record => {
+                const nombre = record.get('cliente_nombre') || '';
+                const apellido = record.get('cliente_apellido') || '';
+                return {
+                    cliente_nombre: `${nombre} ${apellido}`.trim(),
+                    total_cobertura: record.get('total_cobertura')
+                };
+            });
         } finally {
             await session.close();
         }

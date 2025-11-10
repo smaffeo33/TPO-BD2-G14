@@ -93,6 +93,7 @@ const parseVehiculo = (v) => ({
 const parsePoliza = (p) => ({
     // keep natural string id as _id for the collection (avoids inventing ids)
     _id: p.nro_poliza,                                    // string _id = nro_poliza
+    nro_poliza: p.nro_poliza,
     id_cliente: toIntId(p.id_cliente, 'poliza.id_cliente'),
     id_agente: p.id_agente && String(p.id_agente).trim() !== '' ? toIntId(p.id_agente, 'poliza.id_agente') : null,
     estado: p.estado ? String(p.estado).toLowerCase() : null,
@@ -105,6 +106,7 @@ const parsePoliza = (p) => ({
 
 const parseSiniestro = (s) => ({
     _id: toIntId(s.id_siniestro, 'siniestro._id'),
+    id_siniestro:s.id_siniestro,
     nro_poliza: s.nro_poliza,
     tipo: s.tipo,
     fecha: parseDateDDMMYYYY(s.fecha),
@@ -359,7 +361,8 @@ async function main() {
 // Build primitive-only arrays for Neo4j
         const clientesForNeo = clientesCSV.map(c => ({
             id_cliente: Number(c.id_cliente),                  // or keep as String if you prefer
-            nombre: `${c.nombre} ${c.apellido}`,
+            nombre_completo: `${c.nombre} ${c.apellido}`.trim(),
+            apellido: c.apellido,
             activo: String(c.activo).toLowerCase() === 'true'
         }));
 
@@ -401,7 +404,7 @@ async function main() {
 // Nodes — only primitives, dates parsed in Cypher
         if (clientesForNeo.length) {
             await neo4jSession.run(
-                'UNWIND $rows AS c CREATE (:Cliente {id_cliente: c.id_cliente, nombre: c.nombre, activo: c.activo})',
+                'UNWIND $rows AS c CREATE (:Cliente {id_cliente: c.id_cliente, nombre: c.nombre_completo, apellido: c.apellido, activo: c.activo})',
                 { rows: clientesForNeo }
             );
         }
@@ -505,14 +508,31 @@ async function main() {
             total_cobertura: pols.reduce((sum, p) => sum + (Number(p.cobertura_total) || 0), 0)
         }));
         const topClientesData = coberturaPorCliente
-            .sort((a, b) => b.total_cobertura - a.total_cobertura)
+            .sort((a, b) => {
+                if (b.total_cobertura !== a.total_cobertura) {
+                    return b.total_cobertura - a.total_cobertura;
+                }
+
+                const clienteA = clienteById.get(a.id_cliente);
+                const clienteB = clienteById.get(b.id_cliente);
+                const apellidoA = (clienteA?.apellido ?? '').toLowerCase();
+                const apellidoB = (clienteB?.apellido ?? '').toLowerCase();
+
+                if (apellidoA !== apellidoB) {
+                    return apellidoA.localeCompare(apellidoB);
+                }
+
+                const nombreA = (clienteA?.nombre ?? '').toLowerCase();
+                const nombreB = (clienteB?.nombre ?? '').toLowerCase();
+                return nombreA.localeCompare(nombreB);
+            })
             .slice(0, 10)
             .map(entry => {
                 const c = clienteById.get(entry.id_cliente);
                 return { cliente_nombre: `${c?.nombre ?? ''} ${c?.apellido ?? ''}`.trim(), total_cobertura: entry.total_cobertura };
             });
 
-        multi.set('ranking:top10_clientes', JSON.stringify(topClientesData));
+        //multi.set('ranking:top10_clientes', JSON.stringify(topClientesData));
 
         await multi.exec();
         console.log('✅ Redis cargado.\n🎉 ¡CARGA DE DATOS COMPLETA Y EXITOSA!');
