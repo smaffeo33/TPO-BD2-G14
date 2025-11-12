@@ -20,7 +20,7 @@ Sistema de backoffice que implementa persistencia políglota combinando **MongoD
 ## 🔧 Requisitos Previos
 - **Docker 24+** y **Docker Compose v2**
 - **Node.js 18+** y **npm**
-- **curl** y opcionalmente **jq** para formatear JSON
+- **curl** y opcionalmente **jq** para formatear JSON (la imagen del contenedor ya los trae preinstalados; solo son necesarios localmente si querés probar desde fuera)
 
 ```bash
 docker --version
@@ -218,12 +218,12 @@ El archivo `.devcontainer/devcontainer.json` reutiliza `docker-compose.yml` para
 
 1. En GitHub → **Code → Create codespace on main**
 2. Codespaces monta `/usr/src/app`, ejecuta `npm install` (postCreate) y expone los puertos 3000/7474/7687/6379/27017
-3. En la terminal del Codespace:
+3. Como Codespaces ya levantó todos los servicios definidos en `docker-compose.yml`, solo necesitás ejecutar:
    ```bash
-   docker compose up --build
    node scripts/loadData.js
    npm start
    ```
+   (No hace falta ni es posible correr `docker compose` dentro del contenedor; esa tarea la realiza GitHub al crear el Codespace.)
 4. Usa la pestaña **Ports** para abrir el puerto 3000 y probar los endpoints. También podés usar `curl` directamente dentro del Codespace.
 5. Validación rápida: `redis-cli -h redis_cache ping` y `cypher-shell -a neo4j://neo4j_db:7687 -u neo4j -p password123 "RETURN 1"`
 
@@ -235,4 +235,3 @@ El archivo `.devcontainer/devcontainer.json` reutiliza `docker-compose.yml` para
 - Para borrar datos: `docker compose down -v`
 
 ---
-
