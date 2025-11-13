@@ -23,6 +23,26 @@ const Q12_NEO4J_QUERY = `
 const Q7_CACHE_KEY = 'ranking:top10_clientes';
 const Q7_LOCK_KEY = 'lock:cache:top10_clientes';
 
+function formatDate(d) {
+    if (!d) return null;
+
+    if (typeof d === 'object' && d.year != null && d.month != null && d.day != null) {
+        const day = String(d.day).padStart(2, '0');
+        const month = String(d.month).padStart(2, '0');
+        const year = String(d.year).padStart(4, '0');
+        return `${day}-${month}-${year}`;
+    }
+
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return null;
+
+    const day = String(dt.getDate()).padStart(2, '0');
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const year = String(dt.getFullYear());
+    return `${day}-${month}-${year}`;
+}
+
+
 /**
  * Q1: Clientes activos con sus pólizas vigentes (array embebido)
  * Base: Neo4j
@@ -47,15 +67,25 @@ async function getClientesActivosConPolizasVigentes() {
                    polizas_vigentes
             ORDER BY c.nombre
         `);
+
         return result.records.map(record => {
-            const polizas = record.get('polizas_vigentes');
-            // Filtrar nulls (cuando no hay pólizas, collect devuelve [{nro_poliza: null, ...}])
-            const polizasLimpias = polizas.filter(p => p.nro_poliza !== null);
+            const polizasRaw = record.get('polizas_vigentes') || [];
+
+
+            const polizasLimpias = polizasRaw.filter(p => p.nro_poliza !== null);
+
+            const polizas = polizasLimpias.map(p => ({
+                nro_poliza: p.nro_poliza,
+                tipo: p.tipo,
+                fecha_inicio: formatDate(p.fecha_inicio),
+                fecha_fin: formatDate(p.fecha_fin),
+                cobertura_total: p.cobertura_total
+            }));
 
             return {
                 id_cliente: record.get('id_cliente'),
                 cliente_nombre: record.get('cliente_nombre'),
-                polizas_vigentes: polizasLimpias
+                polizas_vigentes: polizas // <-- Ahora sí será []
             };
         });
     } finally {
@@ -93,12 +123,10 @@ async function getSiniestrosAbiertos() {
  * Base: MongoDB (simple query with embedded data)
  */
 async function getVehiculosAsegurados() {
-    // Obtener la fecha y hora actual para la comparación
     const today = new Date();
 
     const result = await Cliente.aggregate([
         {
-            // 1. Filtrar clientes que:
             $match: {
                 'vehiculos.0': { $exists: true }, // Tengan al menos un vehículo
                 'poliza_auto_vigente': { $exists: true }, // Tengan una póliza de auto embebida
@@ -106,11 +134,9 @@ async function getVehiculosAsegurados() {
             }
         },
         {
-            // 2. queremos cada vehículo como un documento separado
             $unwind: '$vehiculos'
         },
         {
-            // 3. Filtrar solo los vehículos que están asegurados
             //   TODO: yo eliminaria este booleano, no tiene sentido, ya nos fijamos en cliente si hay póliza. Si hay claramente, está asegurado --> fijarnos en los datasets si hay alguna inconsistencia
             $match: {
                 'vehiculos.asegurado': true
@@ -167,25 +193,18 @@ async function getClientesSinPolizasActivas() {
  */
 async function getAgentesConCantidadPolizas() {
     try {
-        // Asegurarnos que el caché esté "caliente".
-        // Esta función (definida arriba) chequeará si Q5_HASH_KEY existe.
-        // Si no existe, obtendrá un lock y lo poblará desde Neo4j.
-        // Si el lock está ocupado, esperará.
+
         await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
 
-        // Ahora que el caché está caliente, simplemente lo leemos.
-        // Toda la lógica de "Cache miss" y repoblación ya no está aquí,
-        // está centralizada en 'ensureCacheIsWarm'.
+
         const counts = await redisClient.hGetAll(Q5_HASH_KEY);
 
-        // Reforzamos el filtro de agentes activos usando Mongo por si alguien
-        // desactiva un agente después de poblar el cache.
+
         const agentesActivos = await Agente.find({ activo: true })
             .select('_id')
             .lean();
         const agentesActivosSet = new Set(agentesActivos.map(a => String(a._id)));
 
-        // Convertir la respuesta de Redis en el formato de array esperado
         return Object.entries(counts)
             .filter(([key, _]) => key !== '_placeholder') // Filtrar el placeholder si existe
             .filter(([id_agente]) => agentesActivosSet.has(id_agente))
@@ -195,7 +214,6 @@ async function getAgentesConCantidadPolizas() {
             }));
 
     } catch (error) {
-        // Si ensureCacheIsWarm falla (ej. timeout del lock), lanzamos un error.
         console.error('Error en getAgentesConCantidadPolizas:', error.message);
         throw new Error('Could not retrieve agent counts');
     }
@@ -219,7 +237,7 @@ async function getPolizasVencidas() {
             nro_poliza: record.get('nro_poliza'),
             tipo: record.get('tipo'),
             cliente_nombre: record.get('cliente_nombre'),
-            fecha_fin: record.get('fecha_fin')
+            fecha_fin: formatDate(record.get('fecha_fin'))
         }));
     } finally {
         await session.close();
@@ -300,8 +318,8 @@ async function getPolizasActivasOrdenadas() {
         return {
             nro_poliza: p.nro_poliza,
             tipo: p.tipo,
-            fecha_inicio: p.fecha_inicio,
-            fecha_fin: p.fecha_fin,
+            fecha_inicio: formatDate(p.fecha_inicio),
+            fecha_fin: formatDate(p.fecha_fin),
             agente: agenteNombre || 'Sin asignar',
             prima_mensual: p.prima_mensual
         };
@@ -339,7 +357,7 @@ async function getPolizasSuspendidasConCliente() {
  */
 async function getClientesConVariosVehiculos() {
     const clientes = await Cliente.find({
-        'vehiculos.1': { $exists: true } // Has at least 2 vehicles
+        'vehiculos.1': { $exists: true }
     }).select('id_cliente nombre apellido vehiculos').lean();
 
     return clientes.map(c => ({
@@ -356,13 +374,10 @@ async function getClientesConVariosVehiculos() {
  */
 async function getAgentesConCantidadSiniestros() {
     try {
-        // Asegurarnos que el caché esté "caliente"
         await ensureCacheIsWarm(Q12_HASH_KEY, Q12_LOCK_KEY, Q12_NEO4J_QUERY);
 
-        // Leer del caché caliente
         const counts = await redisClient.hGetAll(Q12_HASH_KEY);
 
-        // Convertir la respuesta de Redis en el formato esperado
         return Object.entries(counts)
             .filter(([key, _]) => key !== '_placeholder')
             .map(([id_agente, count]) => ({
