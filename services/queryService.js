@@ -104,27 +104,19 @@ async function getClientesActivosConPolizasVigentes() {
 
 /**
  * Q2: Siniestros abiertos con tipo, monto y cliente afectado
- * Base: Neo4j
+ * Base: MongoDB (usando poliza_snapshot)
  */
 async function getSiniestrosAbiertos() {
-    const session = getNeo4jSession();
-    try {
-        const result = await session.run(`
-            MATCH (c:Cliente)-[:TIENE_POLIZA]->(p:Poliza)-[:CUBRE_SINIESTRO]->(s:Siniestro)
-            WHERE toLower(s.estado) = 'abierto'
-            RETURN s.id_siniestro AS id_siniestro, s.tipo AS tipo,
-                   s.monto_estimado AS monto_estimado, c.nombre AS cliente_nombre
-            ORDER BY s.fecha DESC
-        `);
-        return result.records.map(record => ({
-            id_siniestro: record.get('id_siniestro'),
-            tipo: record.get('tipo'),
-            monto_estimado: record.get('monto_estimado'),
-            cliente_nombre: record.get('cliente_nombre')
-        }));
-    } finally {
-        await session.close();
-    }
+    const siniestros = await Siniestro.find({
+        estado: 'Abierto'
+    }).sort({ fecha: -1 }).lean();
+
+    return siniestros.map(s => ({
+        id_siniestro: s.id_siniestro,
+        tipo: s.tipo,
+        monto_estimado: s.monto_estimado,
+        cliente_nombre: s.poliza_snapshot.cliente.nombre
+    }));
 }
 
 /**
