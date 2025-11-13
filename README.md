@@ -162,6 +162,8 @@ curl -X POST http://localhost:3000/api/queries/q14 \
 
 ### Q15 – Emisión de Pólizas (`services/polizaService.js`)
 `POST /api/queries/q15`
+
+> El campo `nro_poliza` del payload se usa directamente como `_id` en MongoDB. Si lo omitís, el backend genera automáticamente un `POL####` incremental y lo devuelve en la respuesta.
 ```bash
 curl -X POST http://localhost:3000/api/queries/q15 \
   -H "Content-Type: application/json" \
@@ -169,12 +171,12 @@ curl -X POST http://localhost:3000/api/queries/q15 \
     "nro_poliza": "POL9999",
     "id_cliente": "1",
     "id_agente": "101",
-    "tipo": "Auto",
+    "tipo": "Vida",
     "fecha_inicio": "2025-11-07T00:00:00.000Z",
     "fecha_fin": "2026-11-07T00:00:00.000Z",
     "prima_mensual": 35000,
     "cobertura_total": 3000000,
-    "estado": "Vigente"
+    "estado": "Activa"
   }'
 ```
 - Valida en Neo4j que cliente y agente estén activos

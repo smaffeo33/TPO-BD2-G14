@@ -298,7 +298,7 @@ async function getPolizasActivasOrdenadas() {
             .trim();
 
         return {
-            nro_poliza: p.nro_poliza,
+            poliza_id: p._id ? String(p._id) : (p.nro_poliza || null),
             tipo: p.tipo,
             fecha_inicio: p.fecha_inicio,
             fecha_fin: p.fecha_fin,

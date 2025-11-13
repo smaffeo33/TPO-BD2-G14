@@ -63,9 +63,18 @@ async function createPoliza(polizaData) {
         }
 
         // 4. MongoDB (Escritura): Usar id_cliente numérico
+        const polizaId = polizaData.nro_poliza ? String(polizaData.nro_poliza) : undefined;
+
+        if (polizaId) {
+            const polizaExistente = await Poliza.findOne({ _id: polizaId }).lean();
+            if (polizaExistente) {
+                throw new Error(`La póliza ${polizaId} ya existe`);
+            }
+        }
+
         const poliza = new Poliza({
-            id_cliente: numericClienteId, // <-- CORREGIDO
-            nro_poliza: polizaData.nro_poliza, // <-- Restaurado (asumiendo que lo pasás en el body)
+            _id: polizaId,
+            id_cliente: numericClienteId,
             tipo: polizaData.tipo,
             fecha_inicio: polizaData.fecha_inicio,
             fecha_fin: polizaData.fecha_fin,
@@ -88,7 +97,7 @@ async function createPoliza(polizaData) {
                 {
                     $set: {
                         poliza_auto_vigente: {
-                            nro_poliza: poliza.nro_poliza,
+                            nro_poliza: poliza._id,
                             tipo: poliza.tipo,
                             fecha_inicio: poliza.fecha_inicio,
                             fecha_fin: poliza.fecha_fin,
@@ -111,7 +120,7 @@ async function createPoliza(polizaData) {
                 cobertura_total: $cobertura_total
             })
         `, {
-            nro_poliza: poliza.nro_poliza,
+            nro_poliza: poliza._id,
             estado: poliza.estado,
             tipo: poliza.tipo,
             fecha_inicio: poliza.fecha_inicio.toISOString().split('T')[0],
@@ -125,8 +134,8 @@ async function createPoliza(polizaData) {
             MATCH (p:Poliza {nro_poliza: $nro_poliza})
             CREATE (c)-[:TIENE_POLIZA]->(p)
         `, {
-            id_cliente: numericClienteId, // <-- CORREGIDO
-            nro_poliza: poliza.nro_poliza
+            id_cliente: numericClienteId,
+            nro_poliza: poliza._id
         });
 
         await session.run(`
@@ -134,8 +143,8 @@ async function createPoliza(polizaData) {
             MATCH (p:Poliza {nro_poliza: $nro_poliza})
             CREATE (a)-[:GESTIONA]->(p)
         `, {
-            id_agente: numericAgenteId, // <-- CORREGIDO
-            nro_poliza: poliza.nro_poliza
+            id_agente: numericAgenteId,
+            nro_poliza: poliza._id
         });
 
         // 7. Actualizar Póliza Vieja
@@ -188,8 +197,7 @@ async function createPoliza(polizaData) {
  * Get poliza by nro_poliza
  */
 async function getPolizaByNro(nro_poliza) {
-    // nro_poliza es String, está OK
-    const poliza = await Poliza.findOne({ nro_poliza }).lean();
+    const poliza = await Poliza.findOne({ _id: String(nro_poliza) }).lean();
     if (!poliza) {
         throw new Error('Poliza not found');
     }

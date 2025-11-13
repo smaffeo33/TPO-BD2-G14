@@ -93,7 +93,6 @@ const parseVehiculo = (v) => ({
 const parsePoliza = (p) => ({
     // keep natural string id as _id for the collection (avoids inventing ids)
     _id: p.nro_poliza,                                    // string _id = nro_poliza
-    nro_poliza: p.nro_poliza,
     id_cliente: toIntId(p.id_cliente, 'poliza.id_cliente'),
     id_agente: p.id_agente && String(p.id_agente).trim() !== '' ? toIntId(p.id_agente, 'poliza.id_agente') : null,
     estado: p.estado ? String(p.estado).toLowerCase() : null,
@@ -285,18 +284,18 @@ async function main() {
             const vhs = vehiculosByCliente.get(c._id) || [];
             const ps = polizasByCliente.get(c._id) || [];
 
-            const polizaAutoVigente = ps.find(p => {
-                const estado = (p.estado || '').toLowerCase();
-                const tipo = (p.tipo || '').toLowerCase();
-                return (estado === 'vigente' || estado === 'activa') && tipo === 'auto';
-            });
+        const polizaAutoVigente = ps.find(p => {
+            const estado = (p.estado || '').toLowerCase();
+            const tipo = (p.tipo || '').toLowerCase();
+            return (estado === 'vigente' || estado === 'activa') && tipo === 'auto';
+        });
 
-            return {
-                ...c,
-                vehiculos: vhs,
-                poliza_auto_vigente: polizaAutoVigente ? {
-                    nro_poliza: polizaAutoVigente.nro_poliza,
-                    tipo: polizaAutoVigente.tipo,
+        return {
+            ...c,
+            vehiculos: vhs,
+            poliza_auto_vigente: polizaAutoVigente ? {
+                nro_poliza: polizaAutoVigente._id,
+                tipo: polizaAutoVigente.tipo,
                     fecha_inicio: polizaAutoVigente.fecha_inicio,
                     fecha_fin: polizaAutoVigente.fecha_fin,
                     cobertura_total: polizaAutoVigente.cobertura_total,
