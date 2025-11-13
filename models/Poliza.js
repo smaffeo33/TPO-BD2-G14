@@ -9,7 +9,7 @@ const AgenteEmbebidoSchema = new mongoose.Schema({
 }, { _id: false });
 
 const PolizaSchema = new mongoose.Schema({
-    _id: { type: String },  // polizas keep string IDs like "POL1042"
+    _id: { type: String },
     id_cliente: { type: Number, required: true, index: true },
     tipo: String,
     fecha_inicio: Date,

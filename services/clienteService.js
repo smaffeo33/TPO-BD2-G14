@@ -2,7 +2,6 @@ const Cliente = require('../models/Cliente');
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
 const {mongoose} = require("../config/db.mongo");
-// La corrección:
 const polizaService = require("./polizaService");
 
 
@@ -17,7 +16,6 @@ const polizaService = require("./polizaService");
 async function createCliente(clienteData) {
     const session = getNeo4jSession();
     try {
-        // 1. MongoDB: Create cliente
         const cliente = new Cliente({
             nombre: clienteData.nombre,
             apellido: clienteData.apellido,
@@ -33,7 +31,6 @@ async function createCliente(clienteData) {
         });
         await cliente.save();
 
-        // 2. Neo4j: Create node
         await session.run(`
             CREATE (c:Cliente {
                 id_cliente: $id_cliente,
@@ -46,12 +43,8 @@ async function createCliente(clienteData) {
             activo: cliente.activo
         });
 
-        // 3. Redis: Invalidate top10 ranking (in case this client gets policies later)
-        // No need to invalidate now, but good practice
-
         return cliente;
     } catch (error) {
-        // Rollback would require transaction support - for now, throw error
         throw new Error(`Error creating cliente: ${error.message}`);
     } finally {
         await session.close();
@@ -67,7 +60,6 @@ async function updateCliente(id_cliente, updates) {
     try {
         const numericId = Number(id_cliente);
         if (isNaN(numericId)) throw new Error('Invalid ID format');
-        // 1. MongoDB: Update cliente
         const cliente = await Cliente.findOneAndUpdate(
             { _id: numericId },
             { $set: updates },
@@ -78,7 +70,6 @@ async function updateCliente(id_cliente, updates) {
             throw new Error('Cliente not found');
         }
 
-        // 2. Neo4j: Update node properties
         const neo4jUpdates = {};
         if (updates.nombre || updates.apellido) {
             const currentCliente = await Cliente.findOne({ _id:numericId }).lean();
@@ -98,7 +89,6 @@ async function updateCliente(id_cliente, updates) {
             });
         }
 
-        // 3. Redis: Invalidate ranking (name might have changed)
         await redisClient.del('ranking:top10_clientes');
 
         return cliente;
@@ -113,27 +103,22 @@ async function updateCliente(id_cliente, updates) {
  * Delete a cliente
  * Affects: MongoDB, Neo4j, Redis (invalidation)
  */
-// services/cliente.service.js
 
 async function deleteCliente(id_cliente) {
     const session = getNeo4jSession();
     try {
         const numericId = Number(id_cliente);
         if (isNaN(numericId)) throw new Error('Invalid ID format');
-        // -------------------------
 
-
-        // 1. Buscar y suspender pólizas activas (¡Esta lógica está perfecta!)
         const polizasActivas = await polizaService.getActivePolizasByCliente(numericId);
         if (polizasActivas && polizasActivas.length > 0) {
             await Promise.all(
-                polizasActivas.map(poliza => // <-- 'poliza' es un objeto
-                    polizaService.updatePolizaEstado(poliza._id, 'Suspendida') // <-- ¡ARREGLADO!
+                polizasActivas.map(poliza =>
+                    polizaService.updatePolizaEstado(poliza._id, 'Suspendida')
                 )
             );
         }
 
-        // 2. MongoDB: NO BORRAR, "desactivar"
         const cliente = await Cliente.findOneAndUpdate(
             { _id: numericId},
             { $set: { activo: false } },
@@ -144,13 +129,11 @@ async function deleteCliente(id_cliente) {
             throw new Error('Cliente not found');
         }
 
-        // 3. Neo4j: NO BORRAR, "desactivar"
         await session.run(`
             MATCH (c:Cliente {id_cliente: $id_cliente})
             SET c.activo = false  
         `, { id_cliente : numericId });
 
-        // 4. Redis: Invalidar caché
         await redisClient.del('ranking:top10_clientes');
 
         return {

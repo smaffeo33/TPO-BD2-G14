@@ -37,7 +37,6 @@ SiniestroSchema.virtual('id_siniestro')
     .get(function () { return this._id; })
     .set(function (v) { this._id = (v == null ? v : Number(v)); });
 
-/* auto-assign numeric _id from counters on create */
 SiniestroSchema.pre('validate', async function (next) {
     try {
         if (this.isNew && (this._id === undefined || this._id === null)) {

@@ -21,7 +21,6 @@ const Q5_NEO4J_QUERY = `
 async function createPoliza(polizaData) {
     const session = getNeo4jSession();
     try {
-        // CORRECCIÓN 2: Convertir IDs de String a Number
         const numericClienteId = Number(polizaData.id_cliente);
         const numericAgenteId = Number(polizaData.id_agente);
 
@@ -29,7 +28,6 @@ async function createPoliza(polizaData) {
             throw new Error('Formato de ID de Cliente o Agente inválido.');
         }
 
-        // 1. Neo4j (Validación): Usar IDs numéricos
         const validationResult = await session.run(`
             MATCH (c:Cliente {id_cliente: $id_cliente, activo: true})
             MATCH (a:Agente {id_agente: $id_agente, activo: true})
@@ -43,13 +41,11 @@ async function createPoliza(polizaData) {
             throw new Error('Cliente or Agente not found or not active');
         }
 
-        // 2. MongoDB (Lectura): Usar _id numérico
         const agente = await Agente.findOne({ _id: numericAgenteId }).lean();
         if (!agente) {
             throw new Error('Agente not found in MongoDB');
         }
 
-        // 3. Check de Póliza Auto: Usar _id numérico
         const isAutoPolicy = polizaData.tipo.toLowerCase() === 'auto';
         let oldAutoPolizaNro = null;
         let oldAutoPolizaEstado = null;
@@ -62,7 +58,6 @@ async function createPoliza(polizaData) {
             }
         }
 
-        // 4. MongoDB (Escritura): Usar id_cliente numérico
         const polizaId = polizaData.nro_poliza ? String(polizaData.nro_poliza) : undefined;
 
         if (polizaId) {
@@ -88,12 +83,11 @@ async function createPoliza(polizaData) {
                 matricula: agente.matricula
             }
         });
-        await poliza.save(); // Asumimos que Poliza.js tiene hook para _id = nro_poliza
+        await poliza.save();
 
-        // 5. Actualizar Cliente: Usar _id numérico
         if (isAutoPolicy) {
             await Cliente.findOneAndUpdate(
-                { _id: numericClienteId }, // <-- CORREGIDO
+                { _id: numericClienteId },
                 {
                     $set: {
                         poliza_auto_vigente: {
@@ -109,7 +103,7 @@ async function createPoliza(polizaData) {
             );
         }
 
-        // 6. Neo4j (Escritura): nro_poliza es string, está bien
+
         await session.run(`
             CREATE (p:Poliza {
                 nro_poliza: $nro_poliza,
@@ -128,7 +122,7 @@ async function createPoliza(polizaData) {
             cobertura_total: poliza.cobertura_total
         });
 
-        // Relaciones: Usar IDs numéricos
+
         await session.run(`
             MATCH (c:Cliente {id_cliente: $id_cliente})
             MATCH (p:Poliza {nro_poliza: $nro_poliza})
@@ -147,7 +141,6 @@ async function createPoliza(polizaData) {
             nro_poliza: poliza._id
         });
 
-        // 7. Actualizar Póliza Vieja
         if (oldAutoPolizaNro) {
             await session.run(`
                 MATCH (p:Poliza {nro_poliza: $nro_poliza})
@@ -166,15 +159,12 @@ async function createPoliza(polizaData) {
             console.log(`Updated old Auto policy ${oldAutoPolizaNro} to estado: ${oldAutoPolizaEstado}`);
         }
 
-        // 8. Redis (Invalidación Q7): Sin cambios
         await invalidateCacheWithLock(Q7_CACHE_KEY, Q7_LOCK_KEY);
 
-        // 9. Redis (Incremento Q5):
         try {
             const { wasWarm } = await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
 
             if (wasWarm) {
-                // CORRECCIÓN 3: Usar el ID de string original para el HASH
                 await redisClient.hIncrBy(Q5_HASH_KEY, polizaData.id_agente, 1);
                 console.log(`Redis: Incremented poliza count for agente ${polizaData.id_agente}`);
             } else {
@@ -215,7 +205,7 @@ async function getAllPolizas() {
  * Get polizas by cliente
  */
 async function getPolizasByCliente(id_cliente) {
-    // CORRECCIÓN 4: Convertir a número para la consulta
+
     const numericId = Number(id_cliente);
     if (isNaN(numericId)) throw new Error('Invalid ID format');
 
@@ -226,7 +216,7 @@ async function getPolizasByCliente(id_cliente) {
  * Get pólizas activas por cliente
  */
 async function getActivePolizasByCliente(id_cliente) {
-    // CORRECCIÓN 5: Convertir a número para la consulta
+
     const numericId = Number(id_cliente);
     if (isNaN(numericId)) throw new Error('Invalid ID format');
 
@@ -240,11 +230,11 @@ async function getActivePolizasByCliente(id_cliente) {
  * Update poliza estado
  */
 async function updatePolizaEstado(nro_poliza, nuevoEstado) {
-    // Esta función usa nro_poliza (string), por lo que está CORRECTA.
+
     const session = getNeo4jSession();
     try {
         const poliza = await Poliza.findOneAndUpdate(
-            { _id : nro_poliza }, // <-- Esto es un String, está OK
+            { _id : nro_poliza },
             { $set: { estado: nuevoEstado } },
             { new: true }
         );
@@ -254,7 +244,7 @@ async function updatePolizaEstado(nro_poliza, nuevoEstado) {
         }
 
         await session.run(`
-            MATCH (p:Poliza {nro_poliza: $nro_poliza}) // <-- String, OK
+            MATCH (p:Poliza {nro_poliza: $nro_poliza}) 
             SET p.estado = toLower($estado)
         `, { nro_poliza, estado: nuevoEstado });
 
@@ -270,8 +260,8 @@ async function updatePolizaEstado(nro_poliza, nuevoEstado) {
 
 module.exports = {
     createPoliza,
-    getPolizaByNro, // <-- Restaurado
-    getAllPolizas, // <-- Restaurado
+    getPolizaByNro,
+    getAllPolizas,
     getPolizasByCliente,
     updatePolizaEstado,
     getActivePolizasByCliente

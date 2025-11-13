@@ -1,13 +1,12 @@
 const mongoose = require('mongoose');
 
-/* ---------- nextSeq that returns a Number ---------- */
+
 async function nextSeq(key) {
     const db = mongoose.connection?.db;
     if (!db) throw new Error('MongoDB not connected yet');
 
     const counters = db.collection('counters');
 
-    // seed once without touching seq
     await counters.updateOne(
         { _id: key },
         { $setOnInsert: { seq: 0 } },
@@ -33,7 +32,7 @@ async function nextSeq(key) {
     if (!doc || typeof doc.seq !== 'number') {
         throw new Error(`Failed to obtain next sequence for '${key}'`);
     }
-    return doc.seq;                 // <-- return Number (not String)
+    return doc.seq;
 }
 
 module.exports = nextSeq;

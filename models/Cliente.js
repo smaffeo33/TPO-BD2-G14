@@ -4,7 +4,7 @@ const nextSeq = require('./nextSeq');
 /* ---------- Embedded schemas ---------- */
 
 const VehiculoSchema = new mongoose.Schema({
-    _id: {type: Number},            // was String → use Number to match your numeric IDs
+    _id: {type: Number},
     marca: String,
     modelo: String,
     anio: Number,
@@ -19,7 +19,7 @@ const VehiculoSchema = new mongoose.Schema({
 });
 
 const PolizaAutoVigenteSchema = new mongoose.Schema({
-    nro_poliza: String,             // polizas keep string IDs like "POL1042"
+    nro_poliza: String,
     tipo: String,
     fecha_inicio: Date,
     fecha_fin: Date,
@@ -30,7 +30,7 @@ const PolizaAutoVigenteSchema = new mongoose.Schema({
 /* ---------- Cliente schema with numeric _id ---------- */
 
 const ClienteSchema = new mongoose.Schema({
-    _id: { type: Number },          // was String → Number
+    _id: { type: Number },
     nombre: String,
     apellido: String,
     dni: String,
@@ -49,12 +49,10 @@ const ClienteSchema = new mongoose.Schema({
     versionKey: false
 });
 
-/* mirror field if you still want id_cliente in JSON */
 ClienteSchema.virtual('id_cliente')
     .get(function () { return this._id; })
     .set(function (v) { this._id = (v == null ? v : Number(v)); });
 
-/* auto-assign numeric _id from counters on create */
 ClienteSchema.pre('validate', async function (next) {
     try {
         if (this.isNew && (this._id === undefined || this._id === null)) {
