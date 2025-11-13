@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-// Import services
+
 const queryService = require('../services/queryService');
 const clienteService = require('../services/clienteService');
 const siniestroService = require('../services/siniestroService');

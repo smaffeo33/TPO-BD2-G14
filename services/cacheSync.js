@@ -1,7 +1,7 @@
 const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
 
-const LOCK_TTL = 40; // Lock expira en 40 segundos
+const LOCK_TTL = 40;
 
 /**
  * Función helper interna para poblar el caché desde Neo4j.
@@ -17,18 +17,16 @@ async function _populateCacheFromNeo4j(hashKey, neo4jQuery) {
             total: record.get('total').toNumber()
         }));
 
-        // Limpiamos la clave (por si acaso) y la poblamos de cero
         const multi = redisClient.multi();
-        multi.del(hashKey); // Empezar de limpio
+        multi.del(hashKey);
         if (data.length > 0) {
             for (const item of data) {
                 multi.hSet(hashKey, item.id, item.total);
             }
         } else {
-            // Creamos un hash vacío con expiración corta
-            // para evitar que se calcule esto todo el tiempo si no hay datos.
+
             multi.hSet(hashKey, '_placeholder', 'true');
-            multi.expire(hashKey, 300); // Expira en 5 minutos
+            multi.expire(hashKey, 300);
         }
         await multi.exec();
         console.log(`(Helper) Caché ${hashKey} poblado.`);
@@ -46,38 +44,34 @@ async function _populateCacheFromNeo4j(hashKey, neo4jQuery) {
  * Retorna { wasWarm: true/false } indicando si el caché ya existía.
  */
 async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
-    // 1. Ver si el caché existe
+
     const cacheExists = await redisClient.exists(hashKey);
     if (cacheExists) {
-        return { wasWarm: true }; // El caché ya existía
+        return { wasWarm: true };
     }
 
-    // 2. El caché no existe.
+
     console.warn(`(ensureCacheIsWarm) Cache MISS en ${hashKey}. Esperando para adquirir lock...`);
     let lockAcquired = false;
     while (!lockAcquired) {
-        // Intentamos obtener el lock ATÓMICAMENTE con el TTL
+
         lockAcquired = await redisClient.set(lockKey, 'true', {
             NX: true,
             EX: LOCK_TTL
         });
 
         if (!lockAcquired) {
-            // No lo obtuvimos, esperamos y reintentamos
             await new Promise(resolve => setTimeout(resolve, 200));
-
-            // Si mientras esperábamos, otro hilo ya pobló el caché, salimos y evitamos el trabajo.
             const cacheNowExists = await redisClient.exists(hashKey);
             if (cacheNowExists) {
                 console.log(`(ensureCacheIsWarm) El caché fue poblado por otro hilo mientras esperábamos. Continuando.`);
-                return { wasWarm: true }; // Otro thread lo pobló
+                return { wasWarm: true };
             }
         }
     }
 
     console.log(`(ensureCacheIsWarm) Lock adquirido. Verificando caché y repoblando si es necesario...`);
     try {
-        // 4. Doble Verificación
         const cacheNowExists = await redisClient.exists(hashKey);
         if (!cacheNowExists) {
             await _populateCacheFromNeo4j(hashKey, neo4jQuery);
@@ -85,11 +79,10 @@ async function ensureCacheIsWarm(hashKey, lockKey, neo4jQuery) {
     } catch (e) {
         console.error(`(ensureCacheIsWarm) Error durante repoblación:`, e);
     } finally {
-        // 5. Liberamos el lock
         await redisClient.del(lockKey);
         console.log(`(ensureCacheIsWarm) Lock liberado.`);
     }
-    return { wasWarm: false }; // YO lo repoblé
+    return { wasWarm: false };
 }
 
 /**
@@ -135,13 +128,11 @@ async function invalidateCacheWithLock(cacheKey, lockKey) {
  * @returns {Promise<any>} Los datos calculados o cacheados
  */
 async function computeAndCacheWithLock(cacheKey, lockKey, computeFn) {
-    // Fast path: leer cache sin lock
     const cached = await redisClient.get(cacheKey);
     if (cached) {
         return JSON.parse(cached);
     }
 
-    // Cache miss - adquirir lock
     console.log(`(computeAndCacheWithLock) Cache MISS en ${cacheKey}. Adquiriendo lock...`);
     let lockAcquired = false;
     while (!lockAcquired) {
@@ -151,7 +142,6 @@ async function computeAndCacheWithLock(cacheKey, lockKey, computeFn) {
         });
 
         if (!lockAcquired) {
-            // Esperar y verificar si otro thread pobló el cache
             await new Promise(resolve => setTimeout(resolve, 200));
             const nowCached = await redisClient.get(cacheKey);
             if (nowCached) {
@@ -163,17 +153,14 @@ async function computeAndCacheWithLock(cacheKey, lockKey, computeFn) {
 
     console.log(`(computeAndCacheWithLock) Lock adquirido. Calculando...`);
     try {
-        // Double-check después del lock
         const nowCached = await redisClient.get(cacheKey);
         if (nowCached) {
             console.log(`(computeAndCacheWithLock) Cache encontrado después de lock.`);
             return JSON.parse(nowCached);
         }
 
-        // Calcular datos usando la función provista
         const data = await computeFn();
 
-        // Escribir en Redis (aún tenemos el lock)
         await redisClient.set(cacheKey, JSON.stringify(data));
         console.log(`(computeAndCacheWithLock) Cache ${cacheKey} poblado.`);
 

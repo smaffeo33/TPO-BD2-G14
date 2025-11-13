@@ -23,25 +23,39 @@ const Q12_NEO4J_QUERY = `
 const Q7_CACHE_KEY = 'ranking:top10_clientes';
 const Q7_LOCK_KEY = 'lock:cache:top10_clientes';
 
-function formatDate(d) {
-    if (!d) return null;
-
-    if (typeof d === 'object' && d.year != null && d.month != null && d.day != null) {
-        const day = String(d.day).padStart(2, '0');
-        const month = String(d.month).padStart(2, '0');
-        const year = String(d.year).padStart(4, '0');
-        return `${day}-${month}-${year}`;
+/**
+ * Normaliza objetos de fecha provenientes del driver de Neo4j
+ * (que expone year/month/day con low/high) a un string ISO (YYYY-MM-DD).
+ */
+function formatNeo4jDate(value) {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (value.year && value.month && value.day) {
+        const year = value.year.low ?? value.year;
+        const month = value.month.low ?? value.month;
+        const day = value.day.low ?? value.day;
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
-
-    const dt = new Date(d);
-    if (Number.isNaN(dt.getTime())) return null;
-
-    const day = String(dt.getDate()).padStart(2, '0');
-    const month = String(dt.getMonth() + 1).padStart(2, '0');
-    const year = String(dt.getFullYear());
-    return `${day}-${month}-${year}`;
+    if (typeof value.toString === 'function') {
+        return value.toString();
+    }
+    return value;
 }
 
+/**
+ * Normaliza fechas provenientes de Mongo/JS (Date o string ISO) a YYYY-MM-DD.
+ */
+function formatDateOnly(value) {
+    if (!value) return null;
+    if (typeof value === 'string' && value.length <= 10) {
+        return value;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toISOString().split('T')[0];
+}
 
 /**
  * Q1: Clientes activos con sus pólizas vigentes (array embebido)
@@ -67,25 +81,20 @@ async function getClientesActivosConPolizasVigentes() {
                    polizas_vigentes
             ORDER BY c.nombre
         `);
-
         return result.records.map(record => {
-            const polizasRaw = record.get('polizas_vigentes') || [];
-
-
-            const polizasLimpias = polizasRaw.filter(p => p.nro_poliza !== null);
-
-            const polizas = polizasLimpias.map(p => ({
-                nro_poliza: p.nro_poliza,
-                tipo: p.tipo,
-                fecha_inicio: formatDate(p.fecha_inicio),
-                fecha_fin: formatDate(p.fecha_fin),
-                cobertura_total: p.cobertura_total
-            }));
+            const polizas = record.get('polizas_vigentes') || [];
+            const polizasLimpias = polizas
+                .filter(p => p.nro_poliza !== null)
+                .map(p => ({
+                    ...p,
+                    fecha_inicio: formatNeo4jDate(p.fecha_inicio),
+                    fecha_fin: formatNeo4jDate(p.fecha_fin)
+                }));
 
             return {
                 id_cliente: record.get('id_cliente'),
                 cliente_nombre: record.get('cliente_nombre'),
-                polizas_vigentes: polizas // <-- Ahora sí será []
+                polizas_vigentes: polizasLimpias
             };
         });
     } finally {
@@ -128,9 +137,9 @@ async function getVehiculosAsegurados() {
     const result = await Cliente.aggregate([
         {
             $match: {
-                'vehiculos.0': { $exists: true }, // Tengan al menos un vehículo
-                'poliza_auto_vigente': { $exists: true }, // Tengan una póliza de auto embebida
-                'poliza_auto_vigente.fecha_fin': { $gte: today } // Esa póliza AÚN esté vigente (fecha_fin >= hoy)
+                'vehiculos.0': { $exists: true },
+                'poliza_auto_vigente': { $exists: true },
+                'poliza_auto_vigente.fecha_fin': { $gte: today }
             }
         },
         {
@@ -193,12 +202,9 @@ async function getClientesSinPolizasActivas() {
  */
 async function getAgentesConCantidadPolizas() {
     try {
-
         await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
 
-
         const counts = await redisClient.hGetAll(Q5_HASH_KEY);
-
 
         const agentesActivos = await Agente.find({ activo: true })
             .select('_id')
@@ -206,7 +212,7 @@ async function getAgentesConCantidadPolizas() {
         const agentesActivosSet = new Set(agentesActivos.map(a => String(a._id)));
 
         return Object.entries(counts)
-            .filter(([key, _]) => key !== '_placeholder') // Filtrar el placeholder si existe
+            .filter(([key, _]) => key !== '_placeholder')
             .filter(([id_agente]) => agentesActivosSet.has(id_agente))
             .map(([id_agente, count]) => ({
                 id_agente,
@@ -237,7 +243,7 @@ async function getPolizasVencidas() {
             nro_poliza: record.get('nro_poliza'),
             tipo: record.get('tipo'),
             cliente_nombre: record.get('cliente_nombre'),
-            fecha_fin: formatDate(record.get('fecha_fin'))
+            fecha_fin: formatNeo4jDate(record.get('fecha_fin'))
         }));
     } finally {
         await session.close();
@@ -293,7 +299,7 @@ async function getSiniestrosAccidenteUltimoAnio() {
 
     return siniestros.map(s => ({
         id_siniestro: s.id_siniestro,
-        fecha: s.fecha,
+        fecha: formatDateOnly(s.fecha),
         monto_estimado: s.monto_estimado,
         descripcion: s.descripcion,
         cliente: s.poliza_snapshot.cliente.nombre
@@ -316,10 +322,10 @@ async function getPolizasActivasOrdenadas() {
             .trim();
 
         return {
-            nro_poliza: p.nro_poliza,
+            poliza_id: p._id ? String(p._id) : (p.nro_poliza || null),
             tipo: p.tipo,
-            fecha_inicio: formatDate(p.fecha_inicio),
-            fecha_fin: formatDate(p.fecha_fin),
+            fecha_inicio: formatDateOnly(p.fecha_inicio),
+            fecha_fin: formatDateOnly(p.fecha_fin),
             agente: agenteNombre || 'Sin asignar',
             prima_mensual: p.prima_mensual
         };

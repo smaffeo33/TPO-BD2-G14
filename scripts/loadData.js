@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
@@ -9,7 +8,7 @@ const { redisClient } = require('../config/db.redis');
 
 const resourcesPath = path.join(__dirname, '..', 'resources');
 
-/* ---------- helpers ---------- */
+
 
 function processCSV(fileName) {
     const filePath = path.join(resourcesPath, fileName);
@@ -23,7 +22,6 @@ function processCSV(fileName) {
     });
 }
 
-// dd/mm/yyyy → Date
 function parseDateDDMMYYYY(dateStr) {
     if (!dateStr || typeof dateStr !== 'string') return null;
     const [d, m, y] = dateStr.split('/');
@@ -32,10 +30,8 @@ function parseDateDDMMYYYY(dateStr) {
     return new Date(year, month - 1, day);
 }
 
-// normalize booleans from 'True'/'true'
 const truthy = (v) => v === true || v === 'True' || v === 'true';
 
-// parse positive integer id, or return null
 function toIntId(raw, labelForLog) {
     if (raw === null || raw === undefined) return null;
     const n = Number(String(raw).trim());
@@ -46,7 +42,6 @@ function toIntId(raw, labelForLog) {
     return n;
 }
 
-// extract numeric suffix from like "POL1042" → 1042; otherwise null
 function extractNumericSuffix(str) {
     if (typeof str !== 'string') return null;
     const m = str.match(/(\d+)\s*$/);
@@ -56,7 +51,7 @@ function extractNumericSuffix(str) {
 /* ---------- row parsers (CSV → JS) ---------- */
 
 const parseCliente = (c) => ({
-    _id: toIntId(c.id_cliente, 'cliente._id'),           // numeric _id
+    _id: toIntId(c.id_cliente, 'cliente._id'),
     nombre: c.nombre,
     apellido: c.apellido,
     dni: c.dni,
@@ -69,7 +64,7 @@ const parseCliente = (c) => ({
 });
 
 const parseAgente = (a) => ({
-    _id: toIntId(a.id_agente, 'agente._id'),              // numeric _id
+    _id: toIntId(a.id_agente, 'agente._id'),
     nombre: a.nombre,
     apellido: a.apellido,
     matricula: a.matricula,
@@ -80,7 +75,7 @@ const parseAgente = (a) => ({
 });
 
 const parseVehiculo = (v) => ({
-    _id: toIntId(v.id_vehiculo, 'vehiculo._id'),          // numeric _id (if your CSV has it)
+    _id: toIntId(v.id_vehiculo, 'vehiculo._id'),
     id_cliente: toIntId(v.id_cliente, 'vehiculo.id_cliente'),
     marca: v.marca,
     modelo: v.modelo,
@@ -91,9 +86,7 @@ const parseVehiculo = (v) => ({
 });
 
 const parsePoliza = (p) => ({
-    // keep natural string id as _id for the collection (avoids inventing ids)
-    _id: p.nro_poliza,                                    // string _id = nro_poliza
-    nro_poliza: p.nro_poliza,
+    _id: p.nro_poliza,
     id_cliente: toIntId(p.id_cliente, 'poliza.id_cliente'),
     id_agente: p.id_agente && String(p.id_agente).trim() !== '' ? toIntId(p.id_agente, 'poliza.id_agente') : null,
     estado: p.estado ? String(p.estado).toLowerCase() : null,
@@ -112,7 +105,7 @@ const parseSiniestro = (s) => ({
     fecha: parseDateDDMMYYYY(s.fecha),
     estado: s.estado,
     monto_estimado: Number(s.monto_estimado),
-    descripcion: s.descripcion ?? null              // <-- add this
+    descripcion: s.descripcion ?? null
 });
 
 /* ---------- main ---------- */
@@ -149,7 +142,7 @@ async function main() {
 
         console.log('🗺️  Mapeando / normalizando...');
 
-        // Normalize first to detect & fix inconsistencies
+
         const clientes = clientesCSV.map(parseCliente).filter(c => {
             if (c._id == null) { console.warn(`⚠️  Cliente sin id válido, omitido`); return false; }
             return true;
@@ -160,11 +153,9 @@ async function main() {
             return true;
         });
 
-        // build quick lookups by numeric id
         const clienteById = new Map(clientes.map(c => [c._id, c]));
         const agenteById = new Map(agentes.map(a => [a._id, a]));
 
-        // Polizas: keep string key, but numeric refs
         const polizasRaw = polizasCSV.map(parsePoliza).filter(p => {
             if (!p._id) { console.warn(`⚠️  Póliza sin nro_poliza, omitida`); return false; }
             if (p.id_cliente == null || !clienteById.has(p.id_cliente)) {
@@ -182,8 +173,6 @@ async function main() {
             const ag = (p.id_agente != null) ? agenteById.get(p.id_agente) : null;
             return {
                 ...p,
-                // mantenemos id_agente plano (sirve para Neo4j/Redis/joins),
-                // y además embebemos el snapshot como pide tu schema
                 agente: ag ? {
                     id_agente: ag._id,
                     nombre: ag.nombre,
@@ -193,10 +182,8 @@ async function main() {
             };
         });
 
-        // index polizas by nro_poliza
         const polizaById = new Map(polizasForMongo.map(p => [p._id, p]));
 
-        // Vehículos: numeric id_vehiculo (if present), numeric id_cliente
         const vehiculos = vehiculosCSV.map(parseVehiculo).filter(v => {
             if (v._id == null) { console.warn(`⚠️  Vehículo sin id válido, omitido`); return false; }
             if (v.id_cliente == null || !clienteById.has(v.id_cliente)) {
@@ -206,7 +193,6 @@ async function main() {
             return true;
         });
 
-        // group vehicles by cliente
         const vehiculosByCliente = vehiculos.reduce((acc, v) => {
             if (!acc.has(v.id_cliente)) acc.set(v.id_cliente, []);
             acc.get(v.id_cliente).push({
@@ -221,14 +207,12 @@ async function main() {
             return acc;
         }, new Map());
 
-        // group polizas by cliente (already validated)
         const polizasByCliente = polizasForMongo.reduce((acc, p) => {
             if (!acc.has(p.id_cliente)) acc.set(p.id_cliente, []);
             acc.get(p.id_cliente).push(p);
             return acc;
         }, new Map());
 
-        // Siniestros: numeric id, link to poliza, build snapshot
         const siniestros = siniestrosCSV
             .map(parseSiniestro)
             .filter(s => {
@@ -241,9 +225,9 @@ async function main() {
             })
             .map(s => {
                 const {nro_poliza, ...rest} = s;
-                const pol = polizaById.get(nro_poliza);      // <-- from polizasForMongo (with agente embebido)
+                const pol = polizaById.get(nro_poliza);
                 const cli = clienteById.get(pol.id_cliente);
-                // agente embebido ya viene en `pol.agente` (o null)
+
                 const ag = pol.agente
                     ? {
                         id_agente: pol.agente.id_agente,
@@ -255,7 +239,7 @@ async function main() {
                 return {
                     ...rest,
                     poliza_snapshot: {
-                        nro_poliza: pol._id,                         // mismo que pol.nro_poliza
+                        nro_poliza: pol._id,
                         tipo_cobertura: pol.tipo,
                         fecha_vigencia_inicio: pol.fecha_inicio,
                         fecha_vigencia_fin: pol.fecha_fin,
@@ -280,23 +264,23 @@ async function main() {
         }
         if (siniestros.length) await db.collection('siniestros').insertMany(siniestros, { ordered: true });
 
-        // Enriquecer clientes con vehículos y poliza_auto_vigente (tipo=auto & estado activo)
+
         const clientesDocs = clientes.map(c => {
             const vhs = vehiculosByCliente.get(c._id) || [];
             const ps = polizasByCliente.get(c._id) || [];
 
-            const polizaAutoVigente = ps.find(p => {
-                const estado = (p.estado || '').toLowerCase();
-                const tipo = (p.tipo || '').toLowerCase();
-                return (estado === 'vigente' || estado === 'activa') && tipo === 'auto';
-            });
+        const polizaAutoVigente = ps.find(p => {
+            const estado = (p.estado || '').toLowerCase();
+            const tipo = (p.tipo || '').toLowerCase();
+            return (estado === 'vigente' || estado === 'activa') && tipo === 'auto';
+        });
 
-            return {
-                ...c,
-                vehiculos: vhs,
-                poliza_auto_vigente: polizaAutoVigente ? {
-                    nro_poliza: polizaAutoVigente.nro_poliza,
-                    tipo: polizaAutoVigente.tipo,
+        return {
+            ...c,
+            vehiculos: vhs,
+            poliza_auto_vigente: polizaAutoVigente ? {
+                nro_poliza: polizaAutoVigente._id,
+                tipo: polizaAutoVigente.tipo,
                     fecha_inicio: polizaAutoVigente.fecha_inicio,
                     fecha_fin: polizaAutoVigente.fecha_fin,
                     cobertura_total: polizaAutoVigente.cobertura_total,
@@ -307,12 +291,10 @@ async function main() {
 
         if (clientesDocs.length) await db.collection('clientes').insertMany(clientesDocs, { ordered: true });
 
-        // finally: insert vehicles as their own collection too (if you want both embedding & separate collection)
         if (vehiculos.length) await db.collection('vehiculos').insertMany(vehiculos, { ordered: true });
 
         console.log('✅ MongoDB cargado.');
 
-        /* ---------- Initialize counters with MAX ids ---------- */
 
         console.log('🧮 Inicializando counters...');
         const counters = db.collection('counters');
@@ -324,19 +306,16 @@ async function main() {
         const maxVeh     = maxOrZero(vehiculos.map(v => v._id).filter(n => Number.isFinite(n)));
         const maxSini    = maxOrZero(siniestros.map(s => s._id));
 
-        // Optional counter for polizas (based on numeric suffix), if you ever want to auto-issue new POLnnnn
         const polNumSuffixes = polizasRaw
             .map(p => extractNumericSuffix(p._id))
             .filter(n => Number.isFinite(n));
         const maxPolNum = maxOrZero(polNumSuffixes);
 
-        // Upsert all
         const upserts = [
             { _id: 'clientes', seq: maxCliente },
             { _id: 'agentes',  seq: maxAgente  },
             { _id: 'vehiculos',seq: maxVeh     },
             { _id: 'siniestros',seq: maxSini   },
-            // keep this if you want to generate POL codes later; otherwise remove
             { _id: 'polizas_num_suffix', seq: maxPolNum }
         ];
 
@@ -349,18 +328,15 @@ async function main() {
         ));
         console.log('✅ Counters inicializados:', upserts);
 
-        /* ---------- Neo4j ---------- */
         function toYMDFromDDMMYYYY(s) {
-            // expects "dd/mm/yyyy"
             if (!s || typeof s !== 'string') return null;
             const [dd, mm, yyyy] = s.split('/');
             if (!dd || !mm || !yyyy) return null;
             return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
         }
 
-// Build primitive-only arrays for Neo4j
         const clientesForNeo = clientesCSV.map(c => ({
-            id_cliente: Number(c.id_cliente),                  // or keep as String if you prefer
+            id_cliente: Number(c.id_cliente),
             nombre_completo: `${c.nombre} ${c.apellido}`.trim(),
             apellido: c.apellido,
             activo: String(c.activo).toLowerCase() === 'true'
@@ -373,10 +349,10 @@ async function main() {
         }));
 
         const polizasForNeo = polizasCSV.map(p => ({
-            nro_poliza: p.nro_poliza,                          // e.g. "POL1042"
-            estado: String(p.estado || '').toLowerCase(),      // "activa"/"vigente"/etc
+            nro_poliza: p.nro_poliza,
+            estado: String(p.estado || '').toLowerCase(),
             tipo: p.tipo,
-            fecha_inicio: toYMDFromDDMMYYYY(p.fecha_inicio),   // "yyyy-mm-dd" string
+            fecha_inicio: toYMDFromDDMMYYYY(p.fecha_inicio),
             fecha_fin: toYMDFromDDMMYYYY(p.fecha_fin),
             cobertura_total: Number(p.cobertura_total),
             id_cliente: Number(p.id_cliente),
@@ -386,7 +362,7 @@ async function main() {
         const siniestrosForNeo = siniestrosCSV.map(s => ({
             id_siniestro: Number(s.id_siniestro),
             tipo: s.tipo,
-            fecha: toYMDFromDDMMYYYY(s.fecha),                 // "yyyy-mm-dd" string
+            fecha: toYMDFromDDMMYYYY(s.fecha),
             estado: s.estado,
             monto_estimado: Number(s.monto_estimado),
             nro_poliza: s.nro_poliza
@@ -395,13 +371,11 @@ async function main() {
 
         console.log('🕸️  Cargando en Neo4j...');
 
-        // Indexes (unchanged)
         await neo4jSession.run('CREATE INDEX cliente_id IF NOT EXISTS FOR (n:Cliente) ON (n.id_cliente)');
         await neo4jSession.run('CREATE INDEX agente_id IF NOT EXISTS FOR (n:Agente) ON (n.id_agente)');
         await neo4jSession.run('CREATE INDEX poliza_id  IF NOT EXISTS FOR (n:Poliza)  ON (n.nro_poliza)');
         await neo4jSession.run('CREATE INDEX siniestro_id IF NOT EXISTS FOR (n:Siniestro) ON (n.id_siniestro)');
 
-// Nodes — only primitives, dates parsed in Cypher
         if (clientesForNeo.length) {
             await neo4jSession.run(
                 'UNWIND $rows AS c CREATE (:Cliente {id_cliente: c.id_cliente, nombre: c.nombre_completo, apellido: c.apellido, activo: c.activo})',
@@ -442,7 +416,6 @@ async function main() {
             );
         }
 
-// Relationships — use the sanitized arrays
         if (polizasForNeo.length) {
             await neo4jSession.run(
                 `UNWIND $rows AS p
@@ -477,12 +450,10 @@ async function main() {
 
         console.log('✅ Neo4j cargado.');
 
-        /* ---------- Redis ---------- */
 
         console.log('⚡ Cargando cálculos a Redis...');
         const multi = redisClient.multi();
 
-        // 1) hset counts:agente:polizas
         const agentePolizasCount = polizasRaw
             .filter(p => Number.isFinite(p.id_agente))
             .reduce((acc, p) => acc.set(p.id_agente, (acc.get(p.id_agente) || 0) + 1), new Map());
@@ -490,7 +461,6 @@ async function main() {
             multi.hSet('counts:agente:polizas', String(id), count);
         }
 
-        // 2) hset counts:agente:siniestros
         const agenteSiniestrosCount = siniestros.reduce((acc, s) => {
             const pol = polizaById.get(s.nro_poliza);
             if (pol && Number.isFinite(pol.id_agente)) {
@@ -502,7 +472,6 @@ async function main() {
             multi.hSet('counts:agente:siniestros', String(id), count);
         }
 
-        // 3) top10 clientes por cobertura_total
         const coberturaPorCliente = Array.from(polizasByCliente.entries()).map(([id_cliente, pols]) => ({
             id_cliente,
             total_cobertura: pols.reduce((sum, p) => sum + (Number(p.cobertura_total) || 0), 0)

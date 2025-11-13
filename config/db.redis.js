@@ -1,7 +1,6 @@
 const { createClient } = require('redis');
 
 
-//TODO: Chequear si va a usar localhost o que
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 const REDIS_PORT = process.env.REDIS_PORT || 6379;
 

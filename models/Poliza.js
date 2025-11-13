@@ -9,7 +9,7 @@ const AgenteEmbebidoSchema = new mongoose.Schema({
 }, { _id: false });
 
 const PolizaSchema = new mongoose.Schema({
-    _id: { type: String },  // polizas keep string IDs like "POL1042"
+    _id: { type: String },
     id_cliente: { type: Number, required: true, index: true },
     tipo: String,
     fecha_inicio: Date,
@@ -26,23 +26,25 @@ const PolizaSchema = new mongoose.Schema({
 });
 
 
-/* mirror field if you still want nro_poliza in JSON */
-PolizaSchema.virtual('nro_poliza')
-    .get(function () { return this._id; })
-    .set(function (v) { this._id = (v == null ? v : String(v)); });
-
-
 PolizaSchema.pre('validate', async function (next) {
     try {
-        if (this.isNew && (this._id === undefined || this._id === null)) {
-            const numSuffix = await nextSeq('polizas_num_suffix');   // String
-            this._id = "POL" + numSuffix;
+        if (this.isNew && !this._id) {
+            const numSuffix = await nextSeq('polizas_num_suffix');
+            this._id = `POL${numSuffix}`;
         }
         next();
     } catch (error) {
         next(error);
     }
 });
+
+PolizaSchema.virtual('nro_poliza')
+    .get(function () {
+        return this._id;
+    })
+    .set(function (v) {
+        this._id = v == null ? v : String(v);
+    });
 
 
 module.exports = mongoose.model('Poliza', PolizaSchema);
