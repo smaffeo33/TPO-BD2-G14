@@ -5,6 +5,7 @@ const Siniestro = require('../models/Siniestro');
 const Poliza = require('../models/Poliza');
 const Agente = require('../models/Agente');
 const { ensureCacheIsWarm, computeAndCacheWithLock } = require('./cacheSync');
+const {connection} = require("mongoose");
 
 const Q5_HASH_KEY = 'counts:agente:polizas';
 const Q5_LOCK_KEY = 'lock:cache:repopulating_q5';
@@ -68,7 +69,7 @@ async function getClientesActivosConPolizasVigentes() {
         const result = await session.run(`
             MATCH (c:Cliente {activo: true})
             OPTIONAL MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
-            WHERE p.estado = 'vigente' OR p.estado = 'activa'
+            WHERE p.estado = 'Activa' OR p.estado = 'activa'
             WITH c, collect({
                 nro_poliza: p.nro_poliza,
                 tipo: p.tipo,
@@ -173,7 +174,7 @@ async function getClientesSinPolizasActivas() {
             MATCH (c:Cliente)
             WHERE NOT EXISTS {
                 MATCH (c)-[:TIENE_POLIZA]->(p:Poliza)
-                WHERE p.estado = 'vigente' OR p.estado = 'activa'
+                WHERE p.estado = 'Activa' OR p.estado = 'activa'
             }
             RETURN c.id_cliente AS id_cliente, c.nombre AS nombre, c.activo AS activo
             ORDER BY c.nombre
@@ -303,25 +304,10 @@ async function getSiniestrosAccidenteUltimoAnio() {
  * Base: MongoDB
  */
 async function getPolizasActivasOrdenadas() {
-    const polizas = await Poliza.find({
-        estado: { $in: ['Activa', 'activa'] }
-    }).sort({ fecha_inicio: 1 }).lean();
-
-    return polizas.map(p => {
-        const agenteNombre = [p.agente?.nombre, p.agente?.apellido]
-            .filter(Boolean)
-            .join(' ')
-            .trim();
-
-        return {
-            poliza_id: p._id ? String(p._id) : (p.nro_poliza || null),
-            tipo: p.tipo,
-            fecha_inicio: formatDateOnly(p.fecha_inicio),
-            fecha_fin: formatDateOnly(p.fecha_fin),
-            agente: agenteNombre || 'Sin asignar',
-            prima_mensual: p.prima_mensual
-        };
-    });
+    return await connection.db
+        .collection('vista_polizas_activas')
+        .find()
+        .toArray();
 }
 
 /**

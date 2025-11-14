@@ -27,11 +27,12 @@ async function createPoliza(polizaData) {
             throw new Error('Formato de ID de Cliente o Agente inválido.');
         }
 
-        const validationResult = await session.run(`
-            MATCH (c:Cliente {id_cliente: $id_cliente, activo: true})
-            MATCH (a:Agente {id_agente: $id_agente, activo: true})
-            RETURN c, a
-        `, { id_cliente: numericClienteId, id_agente: numericAgenteId });
+        const validationResult = await session.run(
+            `MATCH (c:Cliente {id_cliente: $id_cliente, activo: true})
+             MATCH (a:Agente {id_agente: $id_agente, activo: true})
+             RETURN c, a`,
+            { id_cliente: numericClienteId, id_agente: numericAgenteId }
+        );
 
         if (validationResult.records.length === 0) {
             throw new Error('Cliente or Agente not found or not active');
@@ -42,29 +43,24 @@ async function createPoliza(polizaData) {
             throw new Error('Agente not found in MongoDB');
         }
 
-
-        const newPolicyType = polizaData.tipo; // Ej: "Hogar"
+        const newPolicyType = polizaData.tipo;
         let oldPolizaNro = null;
         const newEstadoParaLaVieja = 'Vencida';
 
-        const oldPolicyResult = await session.run(`
-            MATCH (c:Cliente {id_cliente: $id_cliente})-[:TIENE_POLIZA]->(p:Poliza {tipo: $tipo})
-            WHERE p.estado = 'activa' OR p.estado = 'vigente'
-            RETURN p.nro_poliza AS nro_poliza
-            LIMIT 1
-        `, {
-            id_cliente: numericClienteId,
-            tipo: newPolicyType
-        });
+        const oldPolicyResult = await session.run(
+            `MATCH (c:Cliente {id_cliente: $id_cliente})-[:TIENE_POLIZA]->(p:Poliza {tipo: $tipo})
+             WHERE p.estado = 'Activa' OR p.estado = 'activa'
+             RETURN p.nro_poliza AS nro_poliza
+             LIMIT 1`,
+            { id_cliente: numericClienteId, tipo: newPolicyType }
+        );
 
         if (oldPolicyResult.records.length > 0) {
             oldPolizaNro = oldPolicyResult.records[0].get('nro_poliza');
             console.log(`Cliente ${numericClienteId} ya tiene una póliza activa de tipo '${newPolicyType}' (Nro: ${oldPolizaNro}). Se marcará como '${newEstadoParaLaVieja}'.`);
         }
 
-
         const polizaId = polizaData.nro_poliza ? String(polizaData.nro_poliza) : undefined;
-
         if (polizaId) {
             const polizaExistente = await Poliza.findOne({ _id: polizaId }).lean();
             if (polizaExistente) {
@@ -91,7 +87,6 @@ async function createPoliza(polizaData) {
         });
         await poliza.save();
 
-
         const isAutoPolicy = newPolicyType.toLowerCase() === 'auto';
         if (isAutoPolicy) {
             await Cliente.findOneAndUpdate(
@@ -111,51 +106,48 @@ async function createPoliza(polizaData) {
             );
         }
 
-        await session.run(`
-            CREATE (p:Poliza {
+        const fechaInicioStr = poliza.fecha_inicio ? new Date(poliza.fecha_inicio).toISOString().split('T')[0] : null;
+        const fechaFinStr = poliza.fecha_fin ? new Date(poliza.fecha_fin).toISOString().split('T')[0] : null;
+
+        await session.run(
+            `CREATE (p:Poliza {
                 nro_poliza: $nro_poliza,
                 estado: toLower($estado),
                 tipo: $tipo,
                 fecha_inicio: $fecha_inicio,
                 fecha_fin: $fecha_fin,
                 cobertura_total: $cobertura_total
-            })
-        `, {
-            nro_poliza: poliza._id,
-            estado: poliza.estado,
-            tipo: poliza.tipo,
-            fecha_inicio: poliza.fecha_inicio.toISOString().split('T')[0],
-            fecha_fin: poliza.fecha_fin.toISOString().split('T')[0],
-            cobertura_total: poliza.cobertura_total
-        });
+            })`,
+            {
+                nro_poliza: poliza._id,
+                estado: poliza.estado,
+                tipo: poliza.tipo,
+                fecha_inicio: fechaInicioStr,
+                fecha_fin: fechaFinStr,
+                cobertura_total: poliza.cobertura_total
+            }
+        );
 
+        await session.run(
+            `MATCH (c:Cliente {id_cliente: $id_cliente})
+             MATCH (p:Poliza {nro_poliza: $nro_poliza})
+             CREATE (c)-[:TIENE_POLIZA]->(p)`,
+            { id_cliente: numericClienteId, nro_poliza: poliza._id }
+        );
 
-        await session.run(`
-            MATCH (c:Cliente {id_cliente: $id_cliente})
-            MATCH (p:Poliza {nro_poliza: $nro_poliza})
-            CREATE (c)-[:TIENE_POLIZA]->(p)
-        `, {
-            id_cliente: numericClienteId,
-            nro_poliza: poliza._id
-        });
-
-        await session.run(`
-            MATCH (a:Agente {id_agente: $id_agente})
-            MATCH (p:Poliza {nro_poliza: $nro_poliza})
-            CREATE (a)-[:GESTIONA]->(p)
-        `, {
-            id_agente: numericAgenteId,
-            nro_poliza: poliza._id
-        });
+        await session.run(
+            `MATCH (a:Agente {id_agente: $id_agente})
+             MATCH (p:Poliza {nro_poliza: $nro_poliza})
+             CREATE (a)-[:GESTIONA]->(p)`,
+            { id_agente: numericAgenteId, nro_poliza: poliza._id }
+        );
 
         if (oldPolizaNro) {
-            await session.run(`
-                MATCH (p:Poliza {nro_poliza: $nro_poliza})
-                SET p.estado = toLower($nuevo_estado)
-            `, {
-                nro_poliza: oldPolizaNro,
-                nuevo_estado: newEstadoParaLaVieja
-            });
+            await session.run(
+                `MATCH (p:Poliza {nro_poliza: $nro_poliza})
+                 SET p.estado = toLower($nuevo_estado)`,
+                { nro_poliza: oldPolizaNro, nuevo_estado: newEstadoParaLaVieja }
+            );
 
             await Poliza.findOneAndUpdate(
                 { _id: oldPolizaNro },
@@ -166,10 +158,11 @@ async function createPoliza(polizaData) {
         }
 
         await invalidateCacheWithLock(Q7_CACHE_KEY, Q7_LOCK_KEY);
+
         try {
             const { wasWarm } = await ensureCacheIsWarm(Q5_HASH_KEY, Q5_LOCK_KEY, Q5_NEO4J_QUERY);
             if (wasWarm) {
-                await redisClient.hIncrBy(Q5_HASH_KEY, polizaData.id_agente, 1);
+                await redisClient.hIncrBy(Q5_HASH_KEY, String(polizaData.id_agente), 1);
             }
         } catch (redisError) {
             console.error('Redis error (non-fatal) during Q5 sync:', redisError.message);
@@ -182,6 +175,7 @@ async function createPoliza(polizaData) {
         await session.close();
     }
 }
+
 /**
  * Get poliza by nro_poliza
  */
@@ -257,9 +251,6 @@ async function updatePolizaEstado(nro_poliza, nuevoEstado) {
 
 module.exports = {
     createPoliza,
-    getPolizaByNro,
-    getAllPolizas,
-    getPolizasByCliente,
     updatePolizaEstado,
     getActivePolizasByCliente
 };

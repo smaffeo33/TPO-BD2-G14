@@ -89,7 +89,7 @@ const parsePoliza = (p) => ({
     _id: p.nro_poliza,
     id_cliente: toIntId(p.id_cliente, 'poliza.id_cliente'),
     id_agente: p.id_agente && String(p.id_agente).trim() !== '' ? toIntId(p.id_agente, 'poliza.id_agente') : null,
-    estado: p.estado ? String(p.estado).toLowerCase() : null,
+    estado: p.estado ? String(p.estado) : null,
     tipo: p.tipo,
     fecha_inicio: parseDateDDMMYYYY(p.fecha_inicio),
     fecha_fin: parseDateDDMMYYYY(p.fecha_fin),
@@ -114,7 +114,7 @@ async function main() {
     let mongoConn;
 
     try {
-        console.log('🔌 Conectando a las bases de datos...');
+        console.log(' Conectando a las bases de datos...');
         mongoConn = await mongoose.connect(
             process.env.MONGO_URI || 'mongodb://user:pass@localhost:27017/aseguradora?authSource=admin'
         );
@@ -125,13 +125,13 @@ async function main() {
 
         await redisClient.connect();
 
-        console.log('Conexiones establecidas.\n🧹 Borrando datos antiguos...');
+        console.log('Conexiones establecidas.\n Borrando datos antiguos...');
         await db.dropDatabase();
         await neo4jSession.run('MATCH (n) DETACH DELETE n');
         await redisClient.flushAll();
         console.log('Bases de datos limpiadas.');
 
-        console.log('📥 Leyendo archivos CSV...');
+        console.log(' Leyendo archivos CSV...');
         const [clientesCSV, agentesCSV, polizasCSV, siniestrosCSV, vehiculosCSV] = await Promise.all([
             processCSV('clientes.csv'),
             processCSV('agentes.csv'),
@@ -140,16 +140,16 @@ async function main() {
             processCSV('vehiculos.csv')
         ]);
 
-        console.log('🗺️  Mapeando / normalizando...');
+        console.log('  Mapeando / normalizando...');
 
 
         const clientes = clientesCSV.map(parseCliente).filter(c => {
-            if (c._id == null) { console.warn(`⚠️  Cliente sin id válido, omitido`); return false; }
+            if (c._id == null) { console.warn(`  Cliente sin id válido, omitido`); return false; }
             return true;
         });
 
         const agentes = agentesCSV.map(parseAgente).filter(a => {
-            if (a._id == null) { console.warn(`⚠️  Agente sin id válido, omitido`); return false; }
+            if (a._id == null) { console.warn(`  Agente sin id válido, omitido`); return false; }
             return true;
         });
 
@@ -157,13 +157,13 @@ async function main() {
         const agenteById = new Map(agentes.map(a => [a._id, a]));
 
         const polizasRaw = polizasCSV.map(parsePoliza).filter(p => {
-            if (!p._id) { console.warn(`⚠️  Póliza sin nro_poliza, omitida`); return false; }
+            if (!p._id) { console.warn(`  Póliza sin nro_poliza, omitida`); return false; }
             if (p.id_cliente == null || !clienteById.has(p.id_cliente)) {
-                console.warn(`⚠️  Póliza ${p._id} omitida: cliente ${p.id_cliente} no existe`);
+                console.warn(`  Póliza ${p._id} omitida: cliente ${p.id_cliente} no existe`);
                 return false;
             }
             if (p.id_agente != null && !agenteById.has(p.id_agente)) {
-                console.warn(`⚠️  Póliza ${p._id} omitida: agente ${p.id_agente} no existe`);
+                console.warn(`  Póliza ${p._id} omitida: agente ${p.id_agente} no existe`);
                 return false;
             }
             return true;
@@ -185,9 +185,9 @@ async function main() {
         const polizaById = new Map(polizasForMongo.map(p => [p._id, p]));
 
         const vehiculos = vehiculosCSV.map(parseVehiculo).filter(v => {
-            if (v._id == null) { console.warn(`⚠️  Vehículo sin id válido, omitido`); return false; }
+            if (v._id == null) { console.warn(`  Vehículo sin id válido, omitido`); return false; }
             if (v.id_cliente == null || !clienteById.has(v.id_cliente)) {
-                console.warn(`⚠️  Vehículo ${v._id} omitido: cliente ${v.id_cliente} no existe`);
+                console.warn(`  Vehículo ${v._id} omitido: cliente ${v.id_cliente} no existe`);
                 return false;
             }
             return true;
@@ -216,9 +216,9 @@ async function main() {
         const siniestros = siniestrosCSV
             .map(parseSiniestro)
             .filter(s => {
-                if (s._id == null) { console.warn(`⚠️  Siniestro sin id válido, omitido`); return false; }
+                if (s._id == null) { console.warn(` Siniestro sin id válido, omitido`); return false; }
                 if (!s.nro_poliza || !polizaById.has(s.nro_poliza)) {
-                    console.warn(`⚠️  Siniestro ${s._id} omitido: póliza ${s.nro_poliza} no existe`);
+                    console.warn(`  Siniestro ${s._id} omitido: póliza ${s.nro_poliza} no existe`);
                     return false;
                 }
                 return true;
@@ -255,7 +255,7 @@ async function main() {
 
         /* ---------- Mongo inserts ---------- */
 
-        console.log('🧩 Insertando en MongoDB...');
+        console.log('Insertando en MongoDB...');
 
         if (agentes.length) await db.collection('agentes').insertMany(agentes, { ordered: true });
 
@@ -272,7 +272,7 @@ async function main() {
         const polizaAutoVigente = ps.find(p => {
             const estado = (p.estado || '').toLowerCase();
             const tipo = (p.tipo || '').toLowerCase();
-            return (estado === 'vigente' || estado === 'activa') && tipo === 'auto';
+            return ( estado === 'activa') && tipo === 'auto';
         });
 
         return {
@@ -293,10 +293,10 @@ async function main() {
 
         if (vehiculos.length) await db.collection('vehiculos').insertMany(vehiculos, { ordered: true });
 
-        console.log('✅ MongoDB cargado.');
+        console.log('MongoDB cargado.');
 
 
-        console.log('🧮 Inicializando counters...');
+        console.log('Inicializando counters...');
         const counters = db.collection('counters');
 
         const maxOrZero = (arr) => arr.length ? Math.max(...arr) : 0;
@@ -326,7 +326,7 @@ async function main() {
                 { upsert: true }
             )
         ));
-        console.log('✅ Counters inicializados:', upserts);
+        console.log('Counters inicializados:', upserts);
 
         function toYMDFromDDMMYYYY(s) {
             if (!s || typeof s !== 'string') return null;
@@ -369,7 +369,7 @@ async function main() {
         }));
 
 
-        console.log('🕸️  Cargando en Neo4j...');
+        console.log('Cargando en Neo4j...');
 
         await neo4jSession.run('CREATE INDEX cliente_id IF NOT EXISTS FOR (n:Cliente) ON (n.id_cliente)');
         await neo4jSession.run('CREATE INDEX agente_id IF NOT EXISTS FOR (n:Agente) ON (n.id_agente)');
@@ -448,10 +448,10 @@ async function main() {
         }
 
 
-        console.log('✅ Neo4j cargado.');
+        console.log('Neo4j cargado.');
 
 
-        console.log('⚡ Cargando cálculos a Redis...');
+        console.log('Cargando cálculos a Redis...');
         const multi = redisClient.multi();
 
         const agentePolizasCount = polizasRaw
@@ -501,17 +501,65 @@ async function main() {
                 return { cliente_nombre: `${c?.nombre ?? ''} ${c?.apellido ?? ''}`.trim(), total_cobertura: entry.total_cobertura };
             });
 
-        //multi.set('ranking:top10_clientes', JSON.stringify(topClientesData));
 
         await multi.exec();
-        console.log('✅ Redis cargado.\n🎉 ¡CARGA DE DATOS COMPLETA Y EXITOSA!');
+        console.log(' Redis cargado.\n ¡CARGA DE DATOS COMPLETA Y EXITOSA!');
+        try {
+            console.log(' Creando Vistas de MongoDB...');
+
+
+            await db.createCollection(
+                'vista_polizas_activas',
+                {
+                    viewOn: 'polizas',
+                    pipeline: [
+                        {
+                            $match: {
+                                estado: {$in : ['Activa', 'activa']}
+                            }
+                        },
+                        {
+                            $sort: {
+                                fecha_inicio: 1
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                poliza_id: '$_id',
+                                tipo: '$tipo',
+                                fecha_inicio: {
+                                    $dateToString: { format: '%Y-%m-%d', date: '$fecha_inicio' }
+                                },
+                                fecha_fin: {
+                                    $dateToString: { format: '%Y-%m-%d', date: '$fecha_fin' }
+                                },
+                                agente: {
+                                    $ifNull: [
+                                        { $concat: ['$agente.nombre', ' ', '$agente.apellido'] },
+                                        'Sin asignar'
+                                    ]
+                                },
+                                prima_mensual: '$prima_mensual'
+                            }
+                        }
+                    ]
+                }
+            );
+            console.log(' Vista "vista_polizas_activas" creada.');
+
+        } catch (viewError) {
+            console.error(' Error creando la vista:', viewError);
+        }
+
     } catch (error) {
-        console.error('❌ Error durante la carga de datos:', error);
-    } finally {
+        console.error(' Error durante la carga de datos:', error);
+    }
+    finally {
         try { await mongoose.disconnect(); } catch {}
         try { await driver.close(); } catch {}
         try { await redisClient.quit(); } catch {}
-        console.log('🔚 Conexiones cerradas.');
+        console.log('Conexiones cerradas.');
     }
 }
 
