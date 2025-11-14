@@ -3,6 +3,7 @@ const { getNeo4jSession } = require('../config/db.neo4j');
 const { redisClient } = require('../config/db.redis');
 const {mongoose} = require("../config/db.mongo");
 const polizaService = require("./polizaService");
+const {updateClienteMapper, updateClientMapper} = require("./utils")
 
 
 /**
@@ -62,7 +63,7 @@ async function updateCliente(id_cliente, updates) {
         if (isNaN(numericId)) throw new Error('Invalid ID format');
         const cliente = await Cliente.findOneAndUpdate(
             { _id: numericId },
-            { $set: updates },
+            { $set: updateClientMapper(updates) },
             { new: true }
         );
 
