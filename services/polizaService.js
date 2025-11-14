@@ -81,7 +81,7 @@ async function createPoliza(polizaData) {
             fecha_fin: polizaData.fecha_fin,
             prima_mensual: polizaData.prima_mensual,
             cobertura_total: polizaData.cobertura_total,
-            estado: polizaData.estado || 'Vigente',
+            estado: 'Activa',
             agente: {
                 id_agente: agente._id,
                 nombre: agente.nombre,
