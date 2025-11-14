@@ -48,8 +48,8 @@ Servicios expuestos: MongoDB (27017), Neo4j (7474/7687), Redis (6379) y la app (
 ---
 
 ## Cargar Datos Iniciales
-Espera 10–15 s luego de levantar los contenedores y ejecuta:
-```bash
+Espera luego de levantar los contenedores y ejecuta:
+```bash 
 node scripts/loadData.js
 ```
 El script limpia las tres bases, lee los CSV de `resources/` y pobla:
@@ -76,12 +76,6 @@ Redis conectado…
 ## Pruebas y Queries Q1–Q12
 Abre una terminal aparte (el servidor debe seguir corriendo). Las rutas están bajo `/api/queries/qX`. 
 Es muy recomendable utilizar `curl -s … | jq '.'` para formatear.
-
-### Health & Endpoints
-```bash
-curl http://localhost:3000/health
-curl http://localhost:3000/
-```
 
 ### Consultas
 | Query | Descripción | Ejemplo |
@@ -168,7 +162,6 @@ curl -X POST http://localhost:3000/api/queries/q14 \
 curl -X POST http://localhost:3000/api/queries/q15 \
   -H "Content-Type: application/json" \
   -d '{
-    "nro_poliza": "POL9999",
     "id_cliente": "1",
     "id_agente": "101",
     "tipo": "Vida",
@@ -176,7 +169,6 @@ curl -X POST http://localhost:3000/api/queries/q15 \
     "fecha_fin": "2026-11-07T00:00:00.000Z",
     "prima_mensual": 35000,
     "cobertura_total": 3000000,
-    "estado": "Activa"
   }'
 ```
 - Valida en Neo4j que cliente y agente estén activos
@@ -216,18 +208,42 @@ GET ranking:top10_clientes
 ---
 
 ## Uso en GitHub Codespaces
-El archivo `.devcontainer/devcontainer.json` reutiliza `docker-compose.yml` para levantar `app`, `mongo_db`, `neo4j_db` y `redis_cache` dentro de Codespaces.
+El archivo `.devcontainer/devcontainer.json` reutiliza `docker-compose.yml` para levantar automáticamente los servicios `app`, `mongo_db`, `neo4j_db` y `redis_cache` dentro de Codespaces.
 
-1. En GitHub → **Code → Create codespace on main**
-2. Codespaces monta `/usr/src/app`, ejecuta `npm install` (postCreate) y expone los puertos 3000/7474/7687/6379/27017
-3. Como Codespaces ya levantó todos los servicios definidos en `docker-compose.yml`, solo necesitás ejecutar:
-   ```bash
-   node scripts/loadData.js
-   npm start
-   ```
-   (No hace falta ni es posible correr `docker compose` dentro del contenedor; esa tarea la realiza GitHub al crear el Codespace.)
-4. Usa la pestaña **Ports** para abrir el puerto 3000 y probar los endpoints. También podés usar `curl` directamente dentro del Codespace.
-5. Validación rápida: `redis-cli -h redis_cache ping` y `cypher-shell -a neo4j://neo4j_db:7687 -u neo4j -p password123 "RETURN 1"`
+### Pasos para la Ejecución (Codespace)
+
+1. **Iniciar el Codespace:**
+   - Abra el repositorio del TP en GitHub y, desde el menú **<> Code**, lance un nuevo Codespace.
+   - Codespaces construirá los contenedores automáticamente y expondrá los puertos 3000/7474/7687/6379/27017.
+
+2. **Cargar los Datos (Único paso manual):**
+   - Una vez que el entorno de VS Code termine de cargar (esto puede tardar unos minutos mientras construye los contenedores), la terminal estará lista en `/usr/src/app`.
+   - Todos los servicios ya estarán corriendo en segundo plano (MongoDB, Neo4j, Redis y la API Express).
+   - En esa misma terminal, ejecute el script de carga:
+     ```bash
+     node scripts/loadData.js
+     ```
+   - Espere a que el script finalice; verá el mensaje **"¡CARGA DE DATOS COMPLETA Y EXITOSA!"**.
+
+3. **Acceder a la API:**
+   - Una vez que los datos estén cargados, la API estará lista para recibir peticiones.
+   - Vaya a la pestaña **"Puertos"** (Ports) en el panel inferior de VS Code.
+   - Verá el puerto **3000** (la API) listado con una "Dirección de Reenvío" (Forwarded Address).
+   - Esta dirección tiene el formato: `https://[nombre-generado]-3000.app.github.dev`
+   - **Ejemplo:** `https://laughing-barnacle-4j779vr954gq2qp97-3000.app.github.dev/api/queries/q1`
+
+4. **Probar los endpoints:**
+   - **Desde el navegador:** Copie la dirección del puerto 3000 y agregue la ruta del endpoint (ej: `/api/queries/q1`)
+   - **Desde curl dentro del Codespace:** Use `localhost`:
+     ```bash
+     curl http://localhost:3000/api/queries/q1 | jq '.'
+     ```
+   - **Desde curl fuera del Codespace:** Use la URL pública generada:
+     ```bash
+     curl https://[tu-codespace]-3000.app.github.dev/api/queries/q1 | jq '.'
+     ```
+
+**Nota:** No es necesario ejecutar `npm start` manualmente; el servidor Express ya está corriendo automáticamente dentro del contenedor `app` gestionado por Codespaces.
 
 ---
 
