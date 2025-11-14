@@ -60,10 +60,11 @@ async function updateCliente(id_cliente, updates) {
     const session = getNeo4jSession();
     try {
         const numericId = Number(id_cliente);
+        const toUpdate =  updateClientMapper(updates);
         if (isNaN(numericId)) throw new Error('Invalid ID format');
         const cliente = await Cliente.findOneAndUpdate(
             { _id: numericId },
-            { $set: updateClientMapper(updates) },
+            { $set: toUpdate },
             { new: true }
         );
 
@@ -72,12 +73,12 @@ async function updateCliente(id_cliente, updates) {
         }
 
         const neo4jUpdates = {};
-        if (updates.nombre || updates.apellido) {
+        if (toUpdate.nombre || toUpdate.apellido) {
             const currentCliente = await Cliente.findOne({ _id:numericId }).lean();
-            neo4jUpdates.nombre = `${updates.nombre || currentCliente.nombre} ${updates.apellido || currentCliente.apellido}`;
+            neo4jUpdates.nombre = `${toUpdate.nombre || currentCliente.nombre} ${toUpdate.apellido || currentCliente.apellido}`;
         }
-        if (updates.activo !== undefined) {
-            neo4jUpdates.activo = updates.activo;
+        if (toUpdate.activo !== undefined) {
+            neo4jUpdates.activo = toUpdate.activo;
         }
 
         if (Object.keys(neo4jUpdates).length > 0) {
